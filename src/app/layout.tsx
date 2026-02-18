@@ -7,7 +7,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased overflow-hidden">{children}</body>
+      <body style={{ margin: 0, padding: 0, background: "black" }}>
+        {children}
+      </body>
     </html>
   );
 }
