@@ -1,56 +1,35 @@
 "use client";
-import { motion } from "framer-motion";
-import { X, Minus, Square } from "lucide-react";
+import { motion } from 'framer-motion';
 
-interface WindowProps {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-  isActive: boolean;
-  onFocus: () => void;
-}
-
-export default function Window({
-  title,
-  children,
-  onClose,
-  isActive,
-  onFocus,
-}: WindowProps) {
+export default function Window({ title, children, onClose, isActive, onFocus }: any) {
   return (
     <motion.div
       drag
       dragMomentum={false}
       onPointerDown={onFocus}
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      className={`absolute w-[600px] h-[400px] bg-zinc-900 border ${
-        isActive ? "border-blue-500 shadow-2xl" : "border-zinc-700 shadow-lg"
-      } rounded-lg overflow-hidden flex flex-col`}
+      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className={`absolute w-[800px] h-[550px] flex flex-col rounded-2xl overflow-hidden glass-window transition-all ${
+        isActive ? 'ring-1 ring-white/30 shadow-2xl scale-[1.01]' : 'opacity-70 shadow-lg'
+      }`}
       style={{ zIndex: isActive ? 50 : 10 }}
     >
-      {/* Title Bar */}
-      <div className="bg-zinc-800 p-2 flex items-center justify-between cursor-grab active:cursor-grabbing select-none">
-        <span className="text-xs font-mono px-2 text-zinc-400">{title}</span>
-        <div className="flex gap-2 px-2">
-          <Minus
-            size={14}
-            className="text-zinc-500 hover:text-white cursor-pointer"
-          />
-          <Square
-            size={14}
-            className="text-zinc-500 hover:text-white cursor-pointer"
-          />
-          <X
-            size={14}
-            onClick={onClose}
-            className="text-red-500 hover:text-red-400 cursor-pointer"
-          />
+      {/* Google-Style Title Bar */}
+      <div className="h-12 bg-white/5 flex items-center justify-between px-5 border-b border-white/5 cursor-grab active:cursor-grabbing">
+        <div className="flex gap-2.5">
+          <div onClick={(e) => { e.stopPropagation(); onClose(); }} className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] hover:bg-[#ff4b40] transition-colors cursor-pointer" />
+          <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] opacity-40" />
+          <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f] opacity-40" />
         </div>
+        <span className="text-[10px] font-bold tracking-[0.2em] text-zinc-400 uppercase select-none">{title}</span>
+        <div className="w-14" />
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-auto bg-black p-4">{children}</div>
+      <div className="flex-1 overflow-hidden relative bg-black/30 backdrop-blur-md">
+        {children}
+      </div>
     </motion.div>
   );
 }

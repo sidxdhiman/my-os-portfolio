@@ -1,10 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-html,
+@theme {
+  --color-accent-purple: #831B84;
+  --animate-scanline: scan 8s linear infinite;
+
+  @keyframes scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(1000%); }
+  }
+}
+
+:root {
+  background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+  color: #e4e4e7;
+}
+
 body {
-    background: black !important;
-    color: white !important;
-    overflow: hidden;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.glass-window {
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.terminal-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(131, 27, 132, 0.3);
+  border-radius: 10px;
 }
