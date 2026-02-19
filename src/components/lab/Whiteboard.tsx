@@ -1,11 +1,11 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { Download, Trash2, X, Minus, Square, Type } from "lucide-react";
+import { Download, Trash2, X, MousePointer2, PenTool } from "lucide-react";
 
 export default function Whiteboard({ onClose }: { onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [color, setColor] = useState("#831B84"); // Your brand purple
+  const [brushColor, setBrushColor] = useState("#831B84");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -19,77 +19,70 @@ export default function Whiteboard({ onClose }: { onClose: () => void }) {
     }
   }, []);
 
-  const startDrawing = (e: React.MouseEvent) => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) {
-      ctx.beginPath();
-      ctx.moveTo(e.clientX, e.clientY);
-      ctx.strokeStyle = color;
-      setIsDrawing(true);
-    }
-  };
-
   const draw = (e: React.MouseEvent) => {
     if (!isDrawing) return;
     const ctx = canvasRef.current?.getContext("2d");
     if (ctx) {
       ctx.lineTo(e.clientX, e.clientY);
+      ctx.strokeStyle = brushColor;
       ctx.stroke();
     }
   };
 
-  const download = () => {
-    const link = document.createElement("a");
-    link.download = "lab-board-export.png";
-    link.href = canvasRef.current?.toDataURL() || "";
-    link.click();
-  };
-
-  const clear = () => {
-    const ctx = canvasRef.current?.getContext("2d");
-    ctx?.clearRect(0, 0, window.innerWidth, window.innerHeight);
-  };
-
   return (
-    <div className="h-full w-full relative bg-[#0a0a0a] cursor-crosshair">
-      {/* Tool Bar */}
-      <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 p-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
+    <div className="h-full w-full relative bg-[#050505] overflow-hidden">
+      {/* Google-Style Toolbar */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 p-3 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+        <div className="flex gap-2 mr-4">
+          <button
+            onClick={() => setBrushColor("#831B84")}
+            className={`w-6 h-6 rounded-full bg-[#831B84] ${brushColor === "#831B84" ? "ring-2 ring-white" : ""}`}
+          />
+          <button
+            onClick={() => setBrushColor("#ffffff")}
+            className={`w-6 h-6 rounded-full bg-white ${brushColor === "#ffffff" ? "ring-2 ring-white" : ""}`}
+          />
+        </div>
         <button
-          onClick={clear}
-          className="p-3 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-red-400 transition-colors"
+          onClick={() => {
+            const ctx = canvasRef.current?.getContext("2d");
+            ctx?.clearRect(0, 0, window.innerWidth, window.innerHeight);
+          }}
+          className="p-2 hover:bg-white/5 rounded-xl text-zinc-400"
         >
-          <Trash2 size={20} />
+          <Trash2 size={18} />
         </button>
-        <div className="w-px h-6 bg-white/10 mx-1" />
         <button
-          onClick={() => setColor("#831B84")}
-          className={`w-6 h-6 rounded-full bg-[#831B84] border-2 ${color === "#831B84" ? "border-white" : "border-transparent"}`}
-        />
-        <button
-          onClick={() => setColor("#ffffff")}
-          className={`w-6 h-6 rounded-full bg-white border-2 ${color === "#ffffff" ? "border-white" : "border-transparent"}`}
-        />
-        <div className="w-px h-6 bg-white/10 mx-1" />
-        <button
-          onClick={download}
-          className="p-3 hover:bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors"
+          onClick={() => {
+            const link = document.createElement("a");
+            link.download = "sid-lab-export.png";
+            link.href = canvasRef.current?.toDataURL() || "";
+            link.click();
+          }}
+          className="p-2 hover:bg-white/5 rounded-xl text-zinc-400"
         >
-          <Download size={20} />
+          <Download size={18} />
         </button>
+        <div className="w-px h-6 bg-white/10" />
         <button
           onClick={onClose}
-          className="p-3 hover:bg-red-500/20 rounded-xl text-red-500 transition-colors"
+          className="p-2 hover:bg-red-500/20 rounded-xl text-red-500"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
       </div>
 
       <canvas
         ref={canvasRef}
-        onMouseDown={startDrawing}
+        onMouseDown={(e) => {
+          const ctx = canvasRef.current?.getContext("2d");
+          ctx?.beginPath();
+          ctx?.moveTo(e.clientX, e.clientY);
+          setIsDrawing(true);
+        }}
         onMouseMove={draw}
         onMouseUp={() => setIsDrawing(false)}
-        className="absolute inset-0"
+        className="cursor-crosshair"
       />
     </div>
   );
