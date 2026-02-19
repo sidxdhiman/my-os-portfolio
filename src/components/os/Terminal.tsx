@@ -1,60 +1,69 @@
 "use client";
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from "react";
 
 export default function Terminal() {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [history, setHistory] = useState<string[]>([
-    'LabOS(tm) Kernel v4.2.0-release',
-    'Authenticated as root_developer_sid',
-    'Type "help" for a list of system commands.',
+    'Terminal Linked. Type "help" for commands.',
   ]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [history]);
+  useEffect(() => bottomRef.current?.scrollIntoView(), [history]);
 
-  const processCommand = () => {
-    const [cmd, arg] = input.toLowerCase().trim().split(' ');
-    let output = '';
+  const handleExec = () => {
+    const [cmd, arg] = input.toLowerCase().trim().split(" ");
+    let res = "";
 
-    switch (cmd) {
-      case 'help': output = 'AVAILABLE: ls, open [app], clear, whoami, exit'; break;
-      case 'whoami': output = 'User: sid | Access: Developer | Location: /root'; break;
-      case 'ls': output = 'apps/  whiteboard.lab  terminal.sys  pdf_editor.lab'; break;
-      case 'open':
-        if (arg === 'whiteboard') {
-          window.dispatchEvent(new CustomEvent('launch-app', { detail: 'whiteboard' }));
-          output = 'Executing: lab_board.init()... DONE';
-        } else {
-          output = `Error: Cannot find module "${arg}"`;
-        }
-        break;
-      case 'clear': setHistory([]); setInput(''); return;
-      default: output = `sh: command not found: ${cmd}`;
-    }
+    if (cmd === "help")
+      res = "AVAILABLE: open [whiteboard], close, clear, status";
+    else if (cmd === "open") {
+      if (arg === "whiteboard") {
+        window.dispatchEvent(
+          new CustomEvent("os-command", {
+            detail: { action: "navigate", target: "whiteboard" },
+          }),
+        );
+        res = "Navigating to Lab Board...";
+      } else res = `Unknown module: ${arg}`;
+    } else if (cmd === "close") {
+      window.dispatchEvent(
+        new CustomEvent("os-command", { detail: { action: "close_terminal" } }),
+      );
+      return;
+    } else if (cmd === "clear") {
+      setHistory([]);
+      setInput("");
+      return;
+    } else res = `Command not recognized: ${cmd}`;
 
-    setHistory([...history, `❯ ${input}`, output]);
-    setInput('');
+    setHistory([...history, `❯ ${input}`, res]);
+    setInput("");
   };
 
   return (
-    <div className="p-8 font-mono text-[13px] text-zinc-300 h-full flex flex-col bg-black/40 terminal-scrollbar overflow-y-auto">
-      <div className="flex-1 space-y-1.5">
-        {history.map((line, i) => (
-          <div key={i} className={line.startsWith('❯') ? 'text-[#831B84]' : 'text-zinc-400 opacity-90'}>
-            {line}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-      <div className="flex mt-6 items-center group">
-        <span className="text-[#831B84] mr-3 font-bold">❯</span>
-        <input
-          autoFocus
-          className="bg-transparent outline-none flex-1 text-white border-none focus:ring-0 p-0"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && processCommand()}
-        />
+    <div className="h-full bg-black/80 backdrop-blur-2xl p-8 font-mono text-sm text-zinc-400 overflow-y-auto">
+      <div className="max-w-4xl mx-auto h-full flex flex-col">
+        <div className="flex-1 space-y-1">
+          {history.map((line, i) => (
+            <div
+              key={i}
+              className={line.startsWith("❯") ? "text-[#831B84]" : ""}
+            >
+              {line}
+            </div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
+        <div className="flex items-center mt-4 border-t border-white/5 pt-4">
+          <span className="text-[#831B84] mr-3 font-bold">❯</span>
+          <input
+            autoFocus
+            className="bg-transparent outline-none flex-1 text-white"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleExec()}
+          />
+        </div>
       </div>
     </div>
   );
