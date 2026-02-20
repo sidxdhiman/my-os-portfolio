@@ -3,7 +3,11 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Cpu, Fingerprint, Unlock } from "lucide-react";
 
-export default function LoginSequence({ onLogin }: { onLogin: () => void }) {
+export default function LoginSequence({
+  onLogin,
+}: {
+  onLogin: (name: string) => void;
+}) {
   const [step, setStep] = useState<"id_input" | "auth_check" | "entry">(
     "id_input",
   );
@@ -25,10 +29,11 @@ export default function LoginSequence({ onLogin }: { onLogin: () => void }) {
       return () => clearInterval(interval);
     }
     if (step === "entry") {
-      const timer = setTimeout(onLogin, 2800);
+      // Passes the user's name back to the main dashboard
+      const timer = setTimeout(() => onLogin(name || "SIDHARTH"), 2800);
       return () => clearTimeout(timer);
     }
-  }, [step, onLogin]);
+  }, [step, name, onLogin]);
 
   return (
     <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-[#050505] overflow-hidden">
@@ -122,13 +127,13 @@ export default function LoginSequence({ onLogin }: { onLogin: () => void }) {
           </motion.div>
         )}
 
-        {/* PHASE 3: THE PROFESSIONAL IT LAB OPENING */}
+        {/* PHASE 3: THE "HEAVY DOOR" LAB OPENING */}
         {step === "entry" && (
           <motion.div
             key="entry"
             className="relative w-full h-full flex items-center justify-center"
           >
-            {/* The "Industrial Lab Door" Split */}
+            {/* Left Industrial Door */}
             <motion.div
               initial={{ x: 0 }}
               animate={{ x: "-100%" }}
@@ -145,6 +150,7 @@ export default function LoginSequence({ onLogin }: { onLogin: () => void }) {
               </div>
             </motion.div>
 
+            {/* Right Industrial Door */}
             <motion.div
               initial={{ x: 0 }}
               animate={{ x: "100%" }}
@@ -161,7 +167,7 @@ export default function LoginSequence({ onLogin }: { onLogin: () => void }) {
               </div>
             </motion.div>
 
-            {/* Central Reveal Content */}
+            {/* Central Success Reveal */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
