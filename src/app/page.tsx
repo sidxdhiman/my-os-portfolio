@@ -1,66 +1,162 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useEffect, useRef } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { useOS } from '@/hooks/useOS';
+import type { LabUser } from '@/hooks/useOS';
+import { MatrixRain } from '@/components/MatrixRain';
+import { IdEntry } from '@/components/IdEntry';
+import { IdScan } from '@/components/IdScan';
+import { LabDoor } from '@/components/LabDoor';
+import { Dashboard } from '@/components/Dashboard';
+import { Terminal } from '@/components/Terminal';
+import { NeuralEraser } from '@/components/NeuralEraser';
+import { Whiteboard } from '@/components/Whiteboard';
+
+export default function LabOS() {
+  const os = useOS();
+  const initialized = useRef(false);
+
+  // ── Persistence: check localStorage on mount ──────────────────────────────
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    try {
+      const saved = localStorage.getItem('lab_user');
+      if (saved) {
+        const parsed: LabUser = JSON.parse(saved);
+        if (parsed.name && parsed.accessLevel) {
+          os.setUser(parsed);
+          os.setPhase('door-open'); // skip entry + scan, go right to door
+          return;
+        }
+      }
+    } catch {
+      localStorage.removeItem('lab_user');
+    }
+
+    os.setPhase('id-entry');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Ctrl + ~ shortcut for terminal ────────────────────────────────────────
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        os.toggleTerminal();
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [os]);
+
+  const isDashboard = os.phase === 'dashboard';
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'var(--bg)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Layer 0: Matrix Rain ──────────────────────────────────────────── */}
+      <MatrixRain />
+
+      {/* ── Layer 1: Vignette overlay ─────────────────────────────────────── */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(6,6,8,0.6) 100%)',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }}
+      />
+
+      {/* ── Layer 2: Center content (mathematically locked) ───────────────── */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 5,
+        }}
+      >
+        <AnimatePresence mode="wait">
+          {/* INIT phase — blank while checking localStorage */}
+          {os.phase === 'init' && null}
+
+          {/* ID ENTRY */}
+          {os.phase === 'id-entry' && (
+            <IdEntry
+              key="id-entry"
+              setUser={os.setUser}
+              setPhase={os.setPhase}
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          )}
+
+          {/* ID SCAN */}
+          {os.phase === 'id-scan' && os.user && (
+            <IdScan
+              key="id-scan"
+              user={os.user}
+              setPhase={os.setPhase}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* DASHBOARD — rendered persistently, revealed after door */}
+        {isDashboard && os.user && (
+          <Dashboard
+            user={os.user}
+            pushApp={os.pushApp}
+            openTerminal={os.openTerminal}
+            logout={os.logout}
+          />
+        )}
+      </div>
+
+      {/* ── Layer 3: Door animation (overlays everything during transition) ── */}
+      <AnimatePresence>
+        {(os.phase === 'door-open') && os.user && (
+          <LabDoor
+            key="lab-door"
+            user={os.user}
+            setPhase={os.setPhase}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Layer 4: App windows ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {os.openApps.includes('neural-eraser') && (
+          <NeuralEraser
+            key="neural-eraser"
+            onClose={() => os.closeApp('neural-eraser')}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {os.openApps.includes('whiteboard') && (
+          <Whiteboard
+            key="whiteboard"
+            onClose={() => os.closeApp('whiteboard')}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Layer 5: Terminal (always on top) ────────────────────────────── */}
+      <Terminal
+        isOpen={os.terminalOpen}
+        user={os.user}
+        onClose={os.toggleTerminal}
+        pushApp={os.pushApp}
+      />
+    </main>
   );
 }
