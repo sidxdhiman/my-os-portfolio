@@ -15,17 +15,25 @@ const MODULES = [
         id: 'whiteboard' as AppId,
         icon: '◼',
         title: 'Whiteboard',
-        desc: 'Collaborative digital canvas with glow draw tools',
+        desc: 'Collaborative digital canvas',
         tag: 'CANVAS',
-        color: '#7090d0',
+        color: '#6080c0',
     },
     {
         id: 'neural-eraser' as AppId,
         icon: '⊗',
         title: 'Neural Eraser',
-        desc: 'AI-powered watermark removal engine',
+        desc: 'Real watermark removal via canvas pixel analysis',
         tag: 'AI',
-        color: '#a060b0',
+        color: '#9040a0',
+    },
+    {
+        id: 'pdf-editor' as AppId,
+        icon: '📄',
+        title: 'PDF Editor',
+        desc: 'Full-featured PDF annotator — text, shapes, draw, export',
+        tag: 'EDITOR',
+        color: '#4080d0',
     },
 ];
 
@@ -45,170 +53,148 @@ const STATS = [
     { label: 'Modules', value: '12' },
 ];
 
+const card: React.CSSProperties = {
+    background: 'rgba(12, 12, 20, 0.88)',
+    border: '1px solid rgba(131,27,132,0.16)',
+    borderRadius: 16,
+    backdropFilter: 'blur(24px)',
+};
+
 export function Dashboard({ user, pushApp, openTerminal, logout }: DashboardProps) {
     return (
         <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'auto',
-            padding: '20px 28px',
-            gap: 16,
-            zIndex: 5,
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            overflow: 'auto', padding: '24px 32px', gap: 18, zIndex: 5,
         }}>
-            {/* ── Top bar ─────────────────────────────── */}
-            <motion.div
-                initial={{ opacity: 0, y: -12 }}
+
+            {/* ── Topbar ──────────────────────────────────────── */}
+            <motion.header
+                initial={{ opacity: 0, y: -14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.45 }}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '11px 20px',
-                    background: 'rgba(10,10,18,0.85)',
-                    border: '1px solid rgba(131,27,132,0.15)',
-                    borderRadius: 10,
-                    backdropFilter: 'blur(24px)',
-                }}
+                transition={{ duration: 0.4 }}
+                style={{ ...card, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#831B84' }} className="pulse-dot" />
-                    <span style={{ fontFamily: 'var(--display)', fontSize: 13, fontWeight: 700, color: '#831B84', letterSpacing: 2.5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#831B84' }} className="pulse-dot" />
+                    <span style={{ fontFamily: 'var(--display)', fontSize: 18, fontWeight: 700, color: '#831B84', letterSpacing: 3 }}>
                         LAB OS
                     </span>
-                    <div style={{ height: 12, width: 1, background: 'rgba(131,27,132,0.2)' }} />
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-muted)' }}>
+                    <div style={{ width: 1, height: 16, background: 'rgba(131,27,132,0.2)' }} />
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
                         {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{
-                        fontFamily: 'var(--mono)',
-                        fontSize: 12,
-                        color: 'var(--text-muted)',
-                        padding: '4px 10px',
-                        border: '1px solid rgba(131,27,132,0.12)',
-                        borderRadius: 5,
+                        fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--text-muted)',
+                        padding: '5px 12px', border: '1px solid rgba(131,27,132,0.14)', borderRadius: 8,
                     }}>
                         Ctrl + ~ → Terminal
                     </span>
 
-                    {/* User badge */}
+                    {/* Avatar badge */}
                     <div style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '6px 12px',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 14px',
                         background: 'rgba(131,27,132,0.08)',
-                        border: '1px solid rgba(131,27,132,0.18)',
-                        borderRadius: 7,
+                        border: '1px solid rgba(131,27,132,0.18)', borderRadius: 10,
                     }}>
                         <div style={{
-                            width: 26, height: 26, borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #6a1670, #a040a0)',
+                            width: 32, height: 32, borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #5a1260, #9030a0)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontFamily: 'var(--display)', fontSize: 11, fontWeight: 700, color: '#fff',
+                            fontFamily: 'var(--display)', fontSize: 15, fontWeight: 700, color: '#fff',
                         }}>
                             {user.name[0]}
                         </div>
                         <div>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#e0e0ec', lineHeight: 1.2 }}>{user.name}</div>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'rgba(131,27,132,0.7)' }}>{user.accessLevel}</div>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: '#e8e8f2', lineHeight: 1.2 }}>{user.name}</div>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'rgba(131,27,132,0.7)' }}>{user.accessLevel}</div>
                         </div>
                     </div>
 
+                    {/* Logout */}
                     <button
                         onClick={logout}
                         title="Logout"
                         style={{
-                            background: 'none',
-                            border: '1px solid rgba(255,100,100,0.2)',
-                            borderRadius: 6,
-                            padding: '5px 11px',
-                            color: 'rgba(255,100,100,0.5)',
-                            fontFamily: 'var(--mono)', fontSize: 13,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
+                            background: 'rgba(255,80,80,0.06)',
+                            border: '1px solid rgba(255,80,80,0.2)',
+                            borderRadius: 10, padding: '8px 16px',
+                            color: 'rgba(255,100,100,0.6)',
+                            fontFamily: 'var(--body)', fontSize: 14,
+                            cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.color = '#ff7070'; e.currentTarget.style.borderColor = 'rgba(255,100,100,0.5)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,100,100,0.5)'; e.currentTarget.style.borderColor = 'rgba(255,100,100,0.2)'; }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#ff7070'; e.currentTarget.style.borderColor = 'rgba(255,80,80,0.45)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,100,100,0.6)'; e.currentTarget.style.borderColor = 'rgba(255,80,80,0.2)'; }}
                     >
-                        ⏻
+                        ⏻ Logout
                     </button>
                 </div>
-            </motion.div>
+            </motion.header>
 
-            {/* ── Welcome banner — centered ──────────── */}
+            {/* ── Welcome — FULLY CENTERED ─────────────────────── */}
             <motion.div
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18, duration: 0.5 }}
+                transition={{ delay: 0.1, duration: 0.45 }}
                 style={{
-                    padding: '36px 40px',
-                    background: 'rgba(9, 8, 16, 0.85)',
-                    border: '1px solid rgba(131,27,132,0.15)',
-                    borderRadius: 14,
-                    backdropFilter: 'blur(24px)',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    /* Center all text */
-                    textAlign: 'center',
+                    ...card,
+                    padding: '48px 40px 36px',
+                    /* Full centering — both axis */
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    flexShrink: 0,
                 }}
             >
-                {/* Ambient orb */}
+                {/* Soft ambient blob */}
                 <div style={{
-                    position: 'absolute', top: '-50%', right: '-5%',
-                    width: '30%', paddingTop: '30%', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(131,27,132,0.07) 0%, transparent 70%)',
+                    position: 'absolute', top: '-40%', left: '50%', transform: 'translateX(-50%)',
+                    width: '50%', paddingTop: '30%', borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(131,27,132,0.06) 0%, transparent 70%)',
                     pointerEvents: 'none',
                 }} />
 
-                <div style={{ position: 'relative', zIndex: 1, width: '100%' }}>
-                    <div style={{
-                        fontFamily: 'var(--mono)', fontSize: 12,
-                        color: 'rgba(131,27,132,0.6)', letterSpacing: 2.5, marginBottom: 12,
-                    }}>
-                        system online · access granted
-                    </div>
-                    <h1 style={{
-                        fontFamily: 'var(--display)',
-                        fontSize: 'clamp(28px, 4vw, 48px)',
-                        fontWeight: 900,
-                        color: '#e8e8f0',
-                        letterSpacing: 2,
-                        lineHeight: 1.15,
-                        marginBottom: 12,
-                    }}>
-                        Welcome back,{' '}
-                        <span style={{ color: '#8f1f90' }}>{user.name}</span>
-                    </h1>
-                    <p style={{
-                        fontFamily: 'var(--mono)', fontSize: 13,
-                        color: 'var(--text-muted)', maxWidth: 520,
-                        lineHeight: 1.7, margin: '0 auto',
-                    }}>
-                        Lab modules online. Use Ctrl+~ to open the terminal, or click a module card below.
-                    </p>
-                </div>
+                <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'rgba(131,27,132,0.55)', letterSpacing: 3, marginBottom: 14 }}>
+                    SYSTEM ONLINE · ACCESS GRANTED
+                </p>
+                <h1 style={{
+                    fontFamily: 'var(--display)',
+                    fontSize: 'clamp(32px, 5vw, 56px)',
+                    fontWeight: 700,
+                    letterSpacing: 2,
+                    lineHeight: 1.1,
+                    marginBottom: 14,
+                    color: '#eaeaf2',
+                }}>
+                    Welcome back,{' '}
+                    <span style={{ color: '#9030a0' }}>{user.name}</span>
+                </h1>
+                <p style={{ fontSize: 15, color: 'var(--text-muted)', maxWidth: 500, lineHeight: 1.7 }}>
+                    Lab modules online. Open the terminal with Ctrl+~ or click a module below.
+                </p>
 
                 {/* Stats row — centered */}
-                <div style={{ display: 'flex', gap: 40, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', gap: 48, marginTop: 28, justifyContent: 'center', flexWrap: 'wrap' }}>
                     {STATS.map((s, i) => (
                         <motion.div
                             key={s.label}
-                            initial={{ opacity: 0, y: 6 }}
+                            initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.35 + i * 0.05 }}
+                            transition={{ delay: 0.3 + i * 0.05 }}
                             style={{ textAlign: 'center' }}
                         >
-                            <div style={{ fontFamily: 'var(--display)', fontSize: 26, fontWeight: 900, color: '#7a1a7b', lineHeight: 1 }}>
+                            <div style={{ fontFamily: 'var(--display)', fontSize: 32, fontWeight: 700, color: '#8020a0', lineHeight: 1 }}>
                                 {s.value}
                             </div>
-                            <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1.5, marginTop: 4 }}>
+                            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: 1.5, marginTop: 5 }}>
                                 {s.label}
                             </div>
                         </motion.div>
@@ -216,138 +202,107 @@ export function Dashboard({ user, pushApp, openTerminal, logout }: DashboardProp
                 </div>
             </motion.div>
 
-            {/* ── Main row ────────────────────────────── */}
-            <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
+            {/* ── Modules + Skills ─────────────────────────────── */}
+            <div style={{ display: 'flex', gap: 18, flex: 1, minHeight: 0 }}>
 
-                {/* Modules */}
+                {/* Module cards */}
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.28, duration: 0.45 }}
-                    style={{ flex: '1 1 55%', display: 'flex', flexDirection: 'column', gap: 10 }}
+                    transition={{ delay: 0.2 }}
+                    style={{ flex: '1 1 55%', display: 'flex', flexDirection: 'column', gap: 12 }}
                 >
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 2 }}>
-                        MODULES
-                    </div>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: 2, marginBottom: 4 }}>MODULES</p>
 
                     {MODULES.map((mod, i) => (
                         <motion.button
                             key={mod.id}
                             id={`module-${mod.id}`}
                             onClick={() => pushApp(mod.id)}
-                            whileHover={{ backgroundColor: 'rgba(131,27,132,0.08)' }}
-                            whileTap={{ scale: 0.99 }}
+                            whileHover={{ scale: 1.005, borderColor: 'rgba(131,27,132,0.35)' }}
+                            whileTap={{ scale: 0.995 }}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.32 + i * 0.07 }}
+                            transition={{ delay: 0.25 + i * 0.08 }}
                             style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 16,
-                                padding: '18px 22px',
-                                background: 'rgba(10, 10, 18, 0.82)',
-                                border: '1px solid rgba(131,27,132,0.14)',
-                                borderRadius: 12,
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                backdropFilter: 'blur(16px)',
-                                transition: 'background 0.25s',
-                                width: '100%',
+                                ...card,
+                                display: 'flex', alignItems: 'center', gap: 18,
+                                padding: '20px 24px',
+                                cursor: 'pointer', textAlign: 'left', width: '100%',
+                                transition: 'all 0.2s',
                             }}
                         >
                             <div style={{
-                                width: 46, height: 46, borderRadius: 10,
-                                background: 'rgba(131,27,132,0.07)',
-                                border: '1px solid rgba(131,27,132,0.15)',
+                                width: 52, height: 52, borderRadius: 12, flexShrink: 0,
+                                background: 'rgba(131,27,132,0.08)',
+                                border: '1px solid rgba(131,27,132,0.18)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 20, color: mod.color, flexShrink: 0,
+                                fontSize: 22, color: mod.color,
                             }}>
                                 {mod.icon}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                    <span style={{ fontFamily: 'var(--body)', fontSize: 15, fontWeight: 600, color: '#dcdce8', letterSpacing: 0.2 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
+                                    <span style={{ fontFamily: 'var(--display)', fontSize: 18, fontWeight: 600, color: '#e0e0ee', letterSpacing: 0.5 }}>
                                         {mod.title}
                                     </span>
                                     <span style={{
-                                        fontFamily: 'var(--mono)', fontSize: 9, padding: '2px 6px',
-                                        border: '1px solid rgba(131,27,132,0.2)', borderRadius: 3,
-                                        color: 'rgba(131,27,132,0.6)', letterSpacing: 1.2,
+                                        fontFamily: 'var(--mono)', fontSize: 10, padding: '2px 7px',
+                                        border: '1px solid rgba(131,27,132,0.22)', borderRadius: 4,
+                                        color: 'rgba(131,27,132,0.65)', letterSpacing: 1.5,
                                     }}>
                                         {mod.tag}
                                     </span>
                                 </div>
-                                <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                                    {mod.desc}
-                                </p>
+                                <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{mod.desc}</p>
                             </div>
-                            <div style={{ color: 'rgba(131,27,132,0.3)', fontFamily: 'var(--mono)', fontSize: 20 }}>›</div>
+                            <span style={{ color: 'rgba(131,27,132,0.35)', fontSize: 24, lineHeight: 1 }}>›</span>
                         </motion.button>
                     ))}
 
-                    {/* Terminal launcher */}
+                    {/* Terminal shortcut */}
                     <motion.button
                         onClick={openTerminal}
-                        whileHover={{ backgroundColor: 'rgba(131,27,132,0.06)' }}
+                        whileHover={{ borderColor: 'rgba(131,27,132,0.35)' }}
                         whileTap={{ scale: 0.99 }}
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.48 }}
+                        transition={{ delay: 0.45 }}
                         style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '15px 22px',
+                            display: 'flex', alignItems: 'center', gap: 12, padding: '18px 24px',
                             background: 'rgba(131,27,132,0.03)',
-                            border: '1px dashed rgba(131,27,132,0.2)',
-                            borderRadius: 12, cursor: 'pointer',
-                            color: 'var(--text-muted)',
-                            fontFamily: 'var(--mono)', fontSize: 13, letterSpacing: 1,
-                            width: '100%', transition: 'background 0.25s',
+                            border: '1px dashed rgba(131,27,132,0.18)', borderRadius: 14,
+                            cursor: 'pointer', color: 'var(--text-muted)',
+                            fontSize: 14, fontFamily: 'var(--mono)',
+                            width: '100%', transition: 'all 0.2s',
                         }}
                     >
-                        <span style={{ color: 'rgba(131,27,132,0.5)' }}>{'>'}</span>
-                        Open Terminal (Ctrl + ~)
+                        <span style={{ color: 'rgba(131,27,132,0.45)', fontSize: 16 }}>{'>'}</span>
+                        Open Terminal — Ctrl + ~
                     </motion.button>
                 </motion.div>
 
-                {/* Skills panel */}
+                {/* Skills */}
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.36, duration: 0.45 }}
-                    style={{
-                        flex: '1 1 45%',
-                        background: 'rgba(9, 8, 16, 0.82)',
-                        border: '1px solid rgba(131,27,132,0.14)',
-                        borderRadius: 14,
-                        padding: '22px 24px',
-                        backdropFilter: 'blur(20px)',
-                        display: 'flex', flexDirection: 'column', gap: 14,
-                    }}
+                    transition={{ delay: 0.3 }}
+                    style={{ ...card, flex: '1 1 45%', padding: '24px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}
                 >
-                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: 2 }}>
-                        SKILL MATRIX
-                    </div>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)', letterSpacing: 2 }}>SKILL MATRIX</p>
 
                     {SKILLS.map((skill, i) => (
                         <div key={skill.label}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                                <span style={{ fontFamily: 'var(--body)', fontSize: 13, color: 'var(--text-secondary)', letterSpacing: 0.2 }}>
-                                    {skill.label}
-                                </span>
-                                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'rgba(131,27,132,0.7)' }}>
-                                    {skill.pct}%
-                                </span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                                <span style={{ fontSize: 14, color: 'var(--text-secondary)', fontWeight: 500 }}>{skill.label}</span>
+                                <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'rgba(131,27,132,0.65)' }}>{skill.pct}%</span>
                             </div>
-                            <div style={{ height: 4, background: 'rgba(131,27,132,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: 5, background: 'rgba(131,27,132,0.08)', borderRadius: 3, overflow: 'hidden' }}>
                                 <motion.div
                                     initial={{ width: 0 }}
                                     animate={{ width: `${skill.pct}%` }}
-                                    transition={{ delay: 0.5 + i * 0.07, duration: 0.9, ease: 'easeOut' }}
-                                    style={{
-                                        height: '100%',
-                                        background: 'linear-gradient(90deg, rgba(131,27,132,0.7), rgba(180,60,180,0.6))',
-                                        borderRadius: 2,
-                                    }}
+                                    transition={{ delay: 0.45 + i * 0.07, duration: 1, ease: 'easeOut' }}
+                                    style={{ height: '100%', background: 'linear-gradient(90deg, #6a1a7a, #b050c0)', borderRadius: 3 }}
                                 />
                             </div>
                         </div>
@@ -355,21 +310,21 @@ export function Dashboard({ user, pushApp, openTerminal, logout }: DashboardProp
                 </motion.div>
             </div>
 
-            {/* ── Footer ──────────────────────────────── */}
-            <motion.div
+            {/* ── Footer ──────────────────────────────────────── */}
+            <motion.footer
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.65 }}
+                transition={{ delay: 0.6 }}
                 style={{
                     display: 'flex', justifyContent: 'space-between',
-                    padding: '6px 2px',
-                    fontFamily: 'var(--mono)', fontSize: 11,
-                    color: 'rgba(90,90,114,0.5)', letterSpacing: 0.5,
+                    padding: '8px 4px',
+                    fontSize: 12, color: 'rgba(90,90,114,0.45)',
+                    fontFamily: 'var(--mono)', flexShrink: 0,
                 }}
             >
                 <span>© 2026 Laboratory OS — Sidharth</span>
                 <span>{user.name} · {user.accessLevel}</span>
-            </motion.div>
+            </motion.footer>
         </div>
     );
 }

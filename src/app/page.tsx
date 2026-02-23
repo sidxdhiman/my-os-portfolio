@@ -12,6 +12,8 @@ import { Dashboard } from '@/components/Dashboard';
 import { Terminal } from '@/components/Terminal';
 import { NeuralEraser } from '@/components/NeuralEraser';
 import { Whiteboard } from '@/components/Whiteboard';
+import { PdfEditor } from '@/components/PdfEditor';
+
 
 export default function LabOS() {
   const os = useOS();
@@ -144,6 +146,15 @@ export default function LabOS() {
           <Whiteboard
             key="whiteboard"
             onClose={() => os.closeApp('whiteboard')}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {os.openApps.includes('pdf-editor') && (
+          <PdfEditor
+            key="pdf-editor"
+            onClose={() => os.closeApp('pdf-editor')}
           />
         )}
       </AnimatePresence>

@@ -19,7 +19,8 @@ type TermLine = {
 
 const MENU_MODULES = [
     { label: 'Whiteboard', id: 'whiteboard' as AppId, desc: 'Collaborative digital canvas' },
-    { label: 'Neural Eraser', id: 'neural-eraser' as AppId, desc: 'AI-powered watermark removal' },
+    { label: 'Neural Eraser', id: 'neural-eraser' as AppId, desc: 'AI watermark removal' },
+    { label: 'PDF Editor', id: 'pdf-editor' as AppId, desc: 'Full-featured PDF editing suite' },
 ];
 
 let idCounter = 0;
@@ -72,7 +73,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
     const [histIdx, setHistIdx] = useState(-1);
     const [showMenu, setShowMenu] = useState(false);
     const [menuIdx, setMenuIdx] = useState(0);
-    const [height, setHeight] = useState(340);
+    const [height, setHeight] = useState(460);
     const inputRef = useRef<HTMLInputElement>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
     const dragControls = useDragControls();
@@ -112,6 +113,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                 '  whoami        — Display current user',
                 '  ls            — List lab modules',
                 '  about         — About Laboratory OS',
+                '  open [name]   — Open a module directly',
                 '',
             ]));
         } else if (trimmed === 'lab') {
@@ -139,6 +141,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                 '',
                 '  drwxr-x  whiteboard/      Collaborative digital canvas',
                 '  drwxr-x  neural-eraser/   AI watermark removal engine',
+                '  drwxr-x  pdf-editor/      Full-featured PDF editing suite',
                 '',
             ]));
         } else if (trimmed === 'about') {
@@ -157,6 +160,9 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
             } else if (appName === 'whiteboard') {
                 pushApp('whiteboard');
                 addLines(makeLines(['', '  Launching Whiteboard...', '']));
+            } else if (appName === 'pdf-editor' || appName === 'pdf') {
+                pushApp('pdf-editor');
+                addLines(makeLines(['', '  Launching PDF Editor...', '']));
             } else {
                 addLines(makeLines([`  Module '${appName}' not found.`], 'error'));
             }
@@ -232,19 +238,19 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                     transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                     style={{
                         position: 'fixed',
-                        bottom: 24,
+                        bottom: 28,
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        width: 'min(680px, 95vw)',
+                        width: 'min(900px, 92vw)',
                         height: height,
                         zIndex: 100,
                         display: 'flex',
                         flexDirection: 'column',
-                        background: 'rgba(6, 6, 12, 0.97)',
-                        border: '1px solid rgba(131, 27, 132, 0.4)',
-                        borderRadius: 12,
-                        boxShadow: '0 0 60px rgba(131, 27, 132, 0.2), 0 24px 80px rgba(0,0,0,0.8)',
-                        backdropFilter: 'blur(24px)',
+                        background: 'rgba(7, 7, 14, 0.97)',
+                        border: '1px solid rgba(131, 27, 132, 0.35)',
+                        borderRadius: 14,
+                        boxShadow: '0 0 60px rgba(131,27,132,0.18), 0 24px 80px rgba(0,0,0,0.85)',
+                        backdropFilter: 'blur(28px)',
                         overflow: 'hidden',
                     }}
                     onClick={() => inputRef.current?.focus()}
@@ -254,16 +260,16 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        background: 'rgba(131, 27, 132, 0.08)',
-                        borderBottom: '1px solid rgba(131, 27, 132, 0.2)',
+                        padding: '12px 18px',
+                        background: 'rgba(131, 27, 132, 0.07)',
+                        borderBottom: '1px solid rgba(131, 27, 132, 0.18)',
                         flexShrink: 0,
                     }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57', cursor: 'pointer' }} onClick={onClose} />
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
-                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28ca41' }} />
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#831B84', letterSpacing: 2, marginLeft: 8 }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button style={{ width: 14, height: 14, borderRadius: '50%', background: '#ff5f57', border: 'none', cursor: 'pointer', padding: 0 }} onClick={onClose} />
+                            <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#ffbd2e' }} />
+                            <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#28ca41' }} />
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#831B84', letterSpacing: 1.5, marginLeft: 10 }}>
                                 LAB-SHELL — {user?.name ?? 'GUEST'}
                             </span>
                         </div>
@@ -306,10 +312,10 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         style={{
                             flex: 1,
                             overflowY: 'auto',
-                            padding: '12px 16px',
+                            padding: '14px 20px',
                             fontFamily: 'var(--mono)',
-                            fontSize: 12,
-                            lineHeight: 1.7,
+                            fontSize: 14,
+                            lineHeight: 1.8,
                         }}
                         onClick={() => inputRef.current?.focus()}
                     >
@@ -381,12 +387,12 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
-                        padding: '10px 16px',
-                        borderTop: '1px solid rgba(131, 27, 132, 0.2)',
+                        padding: '12px 20px',
+                        borderTop: '1px solid rgba(131, 27, 132, 0.18)',
                         background: 'rgba(131, 27, 132, 0.04)',
                         flexShrink: 0,
                     }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#831B84' }}>lab@os:~$</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 14, color: '#831B84' }}>lab@os:~$</span>
                         <input
                             ref={inputRef}
                             id="terminal-input"
@@ -400,7 +406,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                 outline: 'none',
                                 color: '#e8e8f0',
                                 fontFamily: 'var(--mono)',
-                                fontSize: 12,
+                                fontSize: 14,
                                 caretColor: '#831B84',
                             }}
                             autoComplete="off"

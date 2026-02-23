@@ -8,7 +8,7 @@ export interface LabUser {
     issuedAt: string;
 }
 
-export type AppId = 'whiteboard' | 'neural-eraser' | 'terminal';
+export type AppId = 'whiteboard' | 'neural-eraser' | 'pdf-editor' | 'terminal';
 
 export interface OSState {
     user: LabUser | null;
