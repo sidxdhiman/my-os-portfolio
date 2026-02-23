@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useOS } from '@/hooks/useOS';
 import type { LabUser } from '@/hooks/useOS';
-import { MatrixRain } from '@/components/MatrixRain';
+
 import { IdEntry } from '@/components/IdEntry';
 import { IdScan } from '@/components/IdScan';
 import { LabDoor } from '@/components/LabDoor';
@@ -63,16 +63,14 @@ export default function LabOS() {
         overflow: 'hidden',
       }}
     >
-      {/* ── Layer 0: Matrix Rain ──────────────────────────────────────────── */}
-      <MatrixRain />
-
-      {/* ── Layer 1: Vignette overlay ─────────────────────────────────────── */}
+      {/* ── Subtle grid background ────────────────────────────────────────── */}
       <div
         aria-hidden="true"
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(6,6,8,0.6) 100%)',
+          backgroundImage: 'linear-gradient(rgba(131,27,132,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(131,27,132,0.04) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
           pointerEvents: 'none',
           zIndex: 1,
         }}

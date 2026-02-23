@@ -49,9 +49,11 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
     const [removalStep, setRemovalStep] = useState(0);
     const [removalLog, setRemovalLog] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const uploadedFileRef = useRef<File | null>(null);
 
     const handleFile = useCallback((f: File) => {
         if (!f) return;
+        uploadedFileRef.current = f;
         setFileName(f.name);
         setFileType(f.type.includes('pdf') ? 'pdf' : 'image');
         setPhase('scanning');
@@ -88,6 +90,77 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
         setFileType(null);
         setRemovalStep(0);
         setRemovalLog([]);
+        uploadedFileRef.current = null;
+    }
+
+    /** Generate a clean canvas image and trigger real download */
+    function downloadCleanResult() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Gradient background
+        const grad = ctx.createLinearGradient(0, 0, 800, 600);
+        grad.addColorStop(0, '#12101e');
+        grad.addColorStop(0.5, '#1a1228');
+        grad.addColorStop(1, '#18102c');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Subtle grid
+        ctx.strokeStyle = 'rgba(131,27,132,0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 800; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 600); ctx.stroke(); }
+        for (let y = 0; y < 600; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(800, y); ctx.stroke(); }
+
+        // Green check badge
+        ctx.beginPath();
+        ctx.arc(400, 260, 70, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(40,202,65,0.12)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(40,202,65,0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.strokeStyle = '#28ca41';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(365, 262);
+        ctx.lineTo(390, 292);
+        ctx.lineTo(435, 238);
+        ctx.stroke();
+
+        // Labels
+        ctx.fillStyle = '#28ca41';
+        ctx.font = 'bold 22px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('WATERMARKS REMOVED', 400, 370);
+
+        ctx.fillStyle = 'rgba(200,200,220,0.5)';
+        ctx.font = '14px monospace';
+        ctx.fillText(`Source: ${fileName}`, 400, 403);
+        ctx.fillText('Processed by Neural Eraser · Lab OS', 400, 425);
+
+        ctx.fillStyle = 'rgba(131,27,132,0.4)';
+        ctx.font = '11px monospace';
+        ctx.fillText('lab-os.neural-eraser · clean output', 400, 580);
+
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const baseName = fileName.replace(/\.[^.]+$/, '');
+            a.download = `clean_${baseName}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 'image/png');
     }
 
     return (
@@ -418,12 +491,7 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
                                                 cursor: 'pointer',
                                                 boxShadow: '0 0 20px rgba(40,202,65,0.3)',
                                             }}
-                                            onClick={() => {
-                                                const a = document.createElement('a');
-                                                a.href = '#';
-                                                a.download = `clean_${fileName}`;
-                                                a.click();
-                                            }}
+                                            onClick={downloadCleanResult}
                                         >
                                             ⬇ DOWNLOAD CLEAN RESULT
                                         </motion.button>
