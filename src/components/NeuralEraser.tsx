@@ -3,90 +3,52 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface NeuralEraserProps {
-    onClose: () => void;
-}
-
+interface NeuralEraserProps { onClose: () => void; }
 type Phase = 'idle' | 'scanning' | 'scanned' | 'removing' | 'done';
 
 const REMOVAL_STEPS = [
-    'Decoding pixel lattice...',
-    'Building luminance map...',
-    'Detecting overlay regions...',
-    'Sampling inpaint neighborhoods...',
-    'Inpainting pass 1/3...',
-    'Inpainting pass 2/3...',
-    'Inpainting pass 3/3...',
-    'Frequency domain cleanup...',
-    'Edge continuity reconstruction...',
-    'Denoising output...',
+    'Decoding pixel lattice…',
+    'Building luminance map…',
+    'Detecting overlay regions…',
+    'Sampling inpaint neighborhoods…',
+    'Inpainting pass 1/3…',
+    'Inpainting pass 2/3…',
+    'Inpainting pass 3/3…',
+    'Frequency domain cleanup…',
+    'Edge continuity reconstruction…',
+    'Denoising output…',
     'Done ✓',
 ];
 
-/* ── The real watermark detector + remover ─────────────────────────────────
-   Algorithm:
-   1. Draw the uploaded image to an off-screen canvas.
-   2. Scan every pixel for "watermark candidates":
-      - High luminance (>215) pixels  →  typical semi-transparent text overlay
-      - Pixels very close to pure white (RGB all > 210)
-   3. For each candidate pixel, compute the weighted median of its 9x9 neighborhood,
-      using only non-candidate pixels as reference.
-   4. Replace the candidate pixel with that neighborhood color.
-   5. Two-pass for better coverage.
-   6. Return a blob for download.
-─────────────────────────────────────────────────────────────────────────── */
-function removeLuminanceWatermarks(
-    imageData: ImageData,
-    threshold = 210,
-    radius = 10,
-): ImageData {
+/* ── Pixel inpainting algorithm ─────────────────────────────────────── */
+function removeLuminanceWatermarks(imageData: ImageData, threshold = 210, radius = 10): ImageData {
     const { data, width, height } = imageData;
     const out = new Uint8ClampedArray(data);
-
-    // Mark candidate pixels (potential watermark)
     const isCandidate = new Uint8Array(width * height);
     for (let i = 0; i < width * height; i++) {
-        const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const lum = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
         if (lum > threshold) isCandidate[i] = 1;
     }
-
-    // Two passes of inpainting
     for (let pass = 0; pass < 2; pass++) {
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const idx = y * width + x;
                 if (!isCandidate[idx]) continue;
-
                 let sumR = 0, sumG = 0, sumB = 0, count = 0;
-                const r0 = Math.max(0, y - radius), r1 = Math.min(height - 1, y + radius);
-                const c0 = Math.max(0, x - radius), c1 = Math.min(width - 1, x + radius);
-
-                for (let ny = r0; ny <= r1; ny++) {
-                    for (let nx = c0; nx <= c1; nx++) {
+                for (let ny = Math.max(0, y - radius); ny <= Math.min(height - 1, y + radius); ny++) {
+                    for (let nx = Math.max(0, x - radius); nx <= Math.min(width - 1, x + radius); nx++) {
                         const ni = ny * width + nx;
                         if (!isCandidate[ni]) {
-                            // Distance-weighted
                             const d = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
                             const w = 1 / (d + 1);
-                            sumR += out[ni * 4] * w;
-                            sumG += out[ni * 4 + 1] * w;
-                            sumB += out[ni * 4 + 2] * w;
-                            count += w;
+                            sumR += out[ni * 4] * w; sumG += out[ni * 4 + 1] * w; sumB += out[ni * 4 + 2] * w; count += w;
                         }
                     }
                 }
-
-                if (count > 0) {
-                    out[idx * 4] = sumR / count;
-                    out[idx * 4 + 1] = sumG / count;
-                    out[idx * 4 + 2] = sumB / count;
-                    out[idx * 4 + 3] = 255;
-                }
+                if (count > 0) { out[idx * 4] = sumR / count; out[idx * 4 + 1] = sumG / count; out[idx * 4 + 2] = sumB / count; out[idx * 4 + 3] = 255; }
             }
         }
     }
-
     return new ImageData(out, width, height);
 }
 
@@ -94,46 +56,26 @@ function processImageFile(file: File, threshold: number): Promise<Blob> {
     return new Promise((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
-
         img.onload = () => {
-            const canvas = document.createElement('canvas');
-            // Cap at 2048 for performance
             const scale = Math.min(1, 2048 / Math.max(img.width, img.height));
-            canvas.width = Math.round(img.width * scale);
-            canvas.height = Math.round(img.height * scale);
-
+            const canvas = Object.assign(document.createElement('canvas'), {
+                width: Math.round(img.width * scale), height: Math.round(img.height * scale),
+            });
             const ctx = canvas.getContext('2d')!;
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
             const raw = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const cleaned = removeLuminanceWatermarks(raw, threshold);
-            ctx.putImageData(cleaned, 0, 0);
-
-            canvas.toBlob((blob) => {
-                URL.revokeObjectURL(url);
-                if (blob) resolve(blob);
-                else reject(new Error('Canvas toBlob failed'));
-            }, 'image/png');
+            ctx.putImageData(removeLuminanceWatermarks(raw, threshold), 0, 0);
+            canvas.toBlob(blob => { URL.revokeObjectURL(url); blob ? resolve(blob) : reject(new Error('toBlob failed')); }, 'image/png');
         };
-
         img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
         img.src = url;
     });
 }
 
-/* ── Component ─────────────────────────────────────────────────────────── */
-
-const panel: React.CSSProperties = {
-    background: 'rgba(10, 10, 18, 0.97)',
-    border: '1px solid rgba(131,27,132,0.2)',
-    borderRadius: 14,
-    backdropFilter: 'blur(24px)',
-};
-
+/* ── Component ──────────────────────────────────────────────────────── */
 export function NeuralEraser({ onClose }: NeuralEraserProps) {
     const [phase, setPhase] = useState<Phase>('idle');
     const [fileName, setFileName] = useState('');
-    const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [removalLog, setRemovalLog] = useState<string[]>([]);
     const [threshold, setThreshold] = useState(210);
@@ -146,68 +88,42 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
     const uploadedFile = useRef<File | null>(null);
 
     const handleFile = useCallback((f: File) => {
-        if (!f) return;
-        if (!f.type.startsWith('image/')) {
-            setError('Only image files are supported (PNG, JPG, WEBP).');
-            return;
-        }
-        setError('');
-        uploadedFile.current = f;
-        setFileName(f.name);
-        setFileType('image');
-        setPreviewUrl(URL.createObjectURL(f));
-        setPhase('scanning');
-        setTimeout(() => setPhase('scanned'), 2200);
+        if (!f.type.startsWith('image/')) { setError('Only image files are supported (PNG, JPG, WEBP).'); return; }
+        setError(''); uploadedFile.current = f; setFileName(f.name);
+        setPreviewUrl(URL.createObjectURL(f)); setPhase('scanning');
+        setTimeout(() => setPhase('scanned'), 1800);
     }, []);
 
     function handleDrop(e: React.DragEvent) {
         e.preventDefault(); setIsDragOver(false);
-        const f = e.dataTransfer.files[0];
-        if (f) handleFile(f);
+        const f = e.dataTransfer.files[0]; if (f) handleFile(f);
     }
 
     async function startRemoval() {
         if (phase !== 'scanned' || !uploadedFile.current) return;
-        setPhase('removing');
-        setRemovalLog([]);
-        setProgress(0);
-        setResultBlob(null);
-
-        // Simulate log steps while processing
+        setPhase('removing'); setRemovalLog([]); setProgress(0); setResultBlob(null);
         REMOVAL_STEPS.slice(0, -1).forEach((step, i) => {
-            setTimeout(() => {
-                setRemovalLog(prev => [...prev, step]);
-                setProgress(Math.round(((i + 1) / REMOVAL_STEPS.length) * 90));
-            }, i * 600);
+            setTimeout(() => { setRemovalLog(prev => [...prev, step]); setProgress(Math.round(((i + 1) / REMOVAL_STEPS.length) * 90)); }, i * 550);
         });
-
         try {
             const blob = await processImageFile(uploadedFile.current, threshold);
-            setResultBlob(blob);
-            setRemovalLog(prev => [...prev, 'Done ✓']);
-            setProgress(100);
-            setTimeout(() => setPhase('done'), 400);
+            setResultBlob(blob); setRemovalLog(prev => [...prev, 'Done ✓']); setProgress(100);
+            setTimeout(() => setPhase('done'), 300);
         } catch {
-            setError('Processing failed. Try a different image.');
-            setPhase('scanned');
+            setError('Processing failed. Try a different image.'); setPhase('scanned');
         }
     }
 
     function downloadResult() {
         if (!resultBlob) return;
         const url = URL.createObjectURL(resultBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `clean_${fileName.replace(/\.[^.]+$/, '')}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const a = Object.assign(document.createElement('a'), { href: url, download: `clean_${fileName.replace(/\.[^.]+$/, '')}.png` });
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function reset() {
-        setPhase('idle'); setFileName(''); setFileType(null);
-        setRemovalLog([]); setProgress(0);
+        setPhase('idle'); setFileName(''); setRemovalLog([]); setProgress(0);
         if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null); setResultBlob(null); setError('');
         uploadedFile.current = null;
@@ -218,66 +134,85 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 16 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             style={{
-                position: 'fixed', inset: '4%',
-                zIndex: 80,
+                position: 'fixed', inset: '4%', zIndex: 80,
                 display: 'flex', flexDirection: 'column',
-                ...panel,
-                boxShadow: '0 0 60px rgba(131,27,132,0.15), 0 32px 80px rgba(0,0,0,0.8)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-xl)',
+                boxShadow: 'var(--shadow-lg)',
+                overflow: 'hidden',
             }}
         >
-            {/* ── Title bar ──── */}
+            {/* ── Header ─────────────────────────────────────────── */}
             <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px 24px', borderBottom: '1px solid rgba(131,27,132,0.15)', flexShrink: 0,
+                padding: '0 24px', height: 56,
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--bg-card)', flexShrink: 0,
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    {/* macOS dots */}
-                    <div style={{ display: 'flex', gap: 7 }}>
-                        <button onClick={onClose} style={{ width: 14, height: 14, borderRadius: '50%', background: '#ff5f57', border: 'none', cursor: 'pointer', padding: 0 }} title="Close" />
-                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#ffbd2e' }} />
-                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#28ca41' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        width: 34, height: 34, borderRadius: 10,
+                        background: 'linear-gradient(135deg, #7b1fa2, #9c27b0)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(123,31,162,0.25)',
+                        fontSize: 16,
+                    }}>✨</div>
+                    <div>
+                        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                            Neural Eraser
+                        </h2>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Watermark removal · AI-powered inpainting</div>
                     </div>
-                    <div style={{ width: 1, height: 18, background: 'rgba(131,27,132,0.2)' }} />
-                    <span style={{ fontFamily: 'var(--display)', fontSize: 18, fontWeight: 600, color: '#e8e8f2', letterSpacing: 1.5 }}>Neural Eraser</span>
                     <span style={{
-                        fontFamily: 'var(--mono)', fontSize: 10, padding: '3px 8px',
-                        background: 'rgba(131,27,132,0.12)', border: '1px solid rgba(131,27,132,0.3)',
-                        borderRadius: 4, color: '#a040a0', letterSpacing: 1.5,
+                        fontSize: 10, padding: '3px 9px', borderRadius: 100,
+                        background: '#f3e5f5', color: '#7b1fa2',
+                        border: '1px solid rgba(123,31,162,0.2)',
+                        fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: 0.5,
                     }}>AI MODULE</span>
                 </div>
-                {/* Big accessible close button */}
-                <button onClick={onClose} style={{
-                    width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 10, cursor: 'pointer', color: 'var(--text-secondary)',
-                    fontSize: 18, transition: 'all 0.15s',
-                }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,80,80,0.12)'; e.currentTarget.style.color = '#ff7070'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
-                    ✕
-                </button>
+
+                <button
+                    onClick={onClose}
+                    style={{
+                        width: 34, height: 34, borderRadius: 8,
+                        border: '1px solid var(--border)', background: 'transparent',
+                        color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#fff5f5'; e.currentTarget.style.color = '#e53e3e'; e.currentTarget.style.borderColor = '#fed7d7'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+                >✕</button>
             </div>
 
-            {/* ── Body ──── */}
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* ── Body ───────────────────────────────────────────── */}
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
-                {/* LEFT — drop / preview */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid rgba(131,27,132,0.1)', overflow: 'hidden' }}>
-                    <div style={{ padding: '14px 24px', borderBottom: '1px solid rgba(131,27,132,0.1)', flexShrink: 0 }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#831B84', letterSpacing: 2 }}>INPUT</span>
+                {/* Left: Input/Preview ─────────────────────────── */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
+                    {/* Section header */}
+                    <div style={{ padding: '10px 20px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' as const, fontFamily: 'var(--mono)' }}>Input</span>
+                        {phase !== 'idle' && (
+                            <span style={{ marginLeft: 'auto' }}>
+                                <span style={{
+                                    fontSize: 11, padding: '2px 8px', borderRadius: 100, fontFamily: 'var(--mono)',
+                                    background: phase === 'done' ? '#e8f5e9' : phase === 'removing' ? '#fff8e1' : '#e3f2fd',
+                                    color: phase === 'done' ? '#2e7d32' : phase === 'removing' ? '#f57f17' : '#1565c0',
+                                }}>
+                                    {phase === 'scanning' ? '⏳ Scanning' : phase === 'scanned' ? '✓ Ready' : phase === 'removing' ? '⚡ Processing' : '✓ Complete'}
+                                </span>
+                            </span>
+                        )}
                     </div>
 
-                    <div style={{ flex: 1, padding: 24, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-                        {/* Error banner */}
+                    <div style={{ flex: 1, padding: 20, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        {/* Error */}
                         {error && (
-                            <div style={{
-                                padding: '12px 16px', background: 'rgba(255,80,80,0.08)',
-                                border: '1px solid rgba(255,80,80,0.25)', borderRadius: 8,
-                                fontSize: 13, color: '#ff8080', fontFamily: 'var(--mono)',
-                            }}>
+                            <div style={{ padding: '12px 16px', background: 'var(--error-bg)', border: '1px solid rgba(211,47,47,0.2)', borderRadius: 10, fontSize: 13, color: 'var(--error)' }}>
                                 ⚠ {error}
                             </div>
                         )}
@@ -291,194 +226,173 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
                                 onDrop={handleDrop}
                                 onClick={() => fileInputRef.current?.click()}
                                 style={{
-                                    flex: 1, minHeight: 260,
-                                    border: `2px dashed ${isDragOver ? '#831B84' : 'rgba(131,27,132,0.28)'}`,
-                                    borderRadius: 14,
-                                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16,
+                                    flex: 1, minHeight: 240,
+                                    border: `2px dashed ${isDragOver ? 'var(--brand)' : 'var(--border-strong)'}`,
+                                    borderRadius: 14, display: 'flex', flexDirection: 'column',
+                                    alignItems: 'center', justifyContent: 'center', gap: 14,
                                     cursor: 'pointer',
-                                    background: isDragOver ? 'rgba(131,27,132,0.07)' : 'transparent',
+                                    background: isDragOver ? 'var(--brand-xlight)' : 'var(--bg)',
                                     transition: 'all 0.2s',
                                 }}
                             >
-                                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                                    onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
-                                <div style={{ fontSize: 52, opacity: isDragOver ? 0.9 : 0.35 }}>{isDragOver ? '⬇' : '⊕'}</div>
+                                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                                <div style={{ fontSize: 48, opacity: isDragOver ? 0.85 : 0.35 }}>{isDragOver ? '⬇' : '🖼'}</div>
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: 16, color: isDragOver ? '#e8e8f2' : 'var(--text-secondary)', marginBottom: 6 }}>
-                                        Drop image here or click to browse
+                                    <div style={{ fontSize: 15, fontWeight: 600, color: isDragOver ? 'var(--brand)' : 'var(--text-secondary)', marginBottom: 6 }}>
+                                        {isDragOver ? 'Release to upload' : 'Drop image here or click to browse'}
                                     </div>
-                                    <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>
-                                        PNG · JPG · WEBP
-                                    </div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>PNG · JPG · WEBP</div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Active: file info + preview */}
+                        {/* Active state */}
                         {phase !== 'idle' && (
                             <>
-                                {/* File header */}
+                                {/* File info bar */}
                                 <div style={{
-                                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                                    background: 'rgba(131,27,132,0.06)', border: '1px solid rgba(131,27,132,0.18)', borderRadius: 10,
+                                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                                    background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10,
                                 }}>
-                                    <span style={{ fontSize: 22 }}>🖼</span>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 14, color: '#e8e8f2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</div>
-                                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                                            {phase === 'scanning' ? '⏳ Scanning...' : phase === 'scanned' ? '✓ Scan complete — ready to remove' : phase === 'removing' ? '⚡ Processing...' : '✓ Clean version ready'}
-                                        </div>
-                                    </div>
+                                    <span style={{ fontSize: 20 }}>🖼</span>
+                                    <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
                                     <button onClick={reset} style={{
-                                        background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-                                        borderRadius: 8, padding: '6px 14px',
-                                        color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13,
-                                        transition: 'all 0.2s',
-                                    }}
-                                        onMouseEnter={e => e.currentTarget.style.color = '#e8e8f2'}
-                                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                                        ✕ Reset
-                                    </button>
+                                        padding: '4px 12px', background: 'transparent', border: '1px solid var(--border)',
+                                        borderRadius: 6, fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer',
+                                    }}>✕ Reset</button>
                                 </div>
 
-                                {/* Image preview */}
+                                {/* Preview */}
                                 {previewUrl && (
-                                    <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(131,27,132,0.15)', background: '#0a0a14' }}>
+                                    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: '#f0f0f0', position: 'relative' }}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={phase === 'done' && resultBlob ? URL.createObjectURL(resultBlob) : previewUrl}
                                             alt="Preview"
-                                            style={{ width: '100%', display: 'block', maxHeight: 280, objectFit: 'contain' }}
+                                            style={{ width: '100%', display: 'block', maxHeight: 260, objectFit: 'contain' }}
                                         />
-                                        {phase === 'scanning' && <div className="neural-scan-line" />}
                                         {phase === 'done' && (
                                             <div style={{
                                                 position: 'absolute', top: 10, right: 10,
-                                                background: 'rgba(40,202,65,0.9)', borderRadius: 6,
-                                                padding: '4px 10px', fontSize: 12, fontFamily: 'var(--mono)', color: '#fff',
+                                                background: 'rgba(46,125,50,0.9)', borderRadius: 6,
+                                                padding: '4px 10px', fontSize: 11, fontFamily: 'var(--mono)', color: '#fff',
                                             }}>✓ CLEAN</div>
                                         )}
                                     </div>
                                 )}
 
-                                {/* Threshold slider (shown when scanned) */}
+                                {/* Threshold slider */}
                                 {phase === 'scanned' && (
-                                    <div style={{ padding: '12px 16px', background: 'rgba(131,27,132,0.04)', border: '1px solid rgba(131,27,132,0.14)', borderRadius: 10 }}>
+                                    <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                                             <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Detection threshold</span>
-                                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#831B84' }}>{threshold}</span>
+                                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--brand)', fontWeight: 600 }}>{threshold}</span>
                                         </div>
                                         <input type="range" min={150} max={250} value={threshold} onChange={e => setThreshold(+e.target.value)}
-                                            style={{ width: '100%', accentColor: '#831B84', cursor: 'pointer' }} />
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginTop: 4 }}>
+                                            style={{ width: '100%', accentColor: 'var(--brand)', cursor: 'pointer' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)', marginTop: 6 }}>
                                             <span>Aggressive (150)</span><span>Conservative (250)</span>
                                         </div>
                                     </div>
                                 )}
 
                                 {/* Action buttons */}
-                                <div style={{ display: 'flex', gap: 10 }}>
-                                    {phase === 'scanned' && (
-                                        <motion.button
-                                            id="start-removal-btn"
-                                            onClick={startRemoval}
-                                            whileTap={{ scale: 0.97 }}
-                                            initial={{ opacity: 0, y: 6 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            style={{
-                                                flex: 1,
-                                                background: 'linear-gradient(135deg, #6a1a7a, #a030a0)',
-                                                border: 'none', borderRadius: 10, padding: '14px 20px',
-                                                color: '#fff', fontFamily: 'var(--display)',
-                                                fontSize: 16, fontWeight: 600, letterSpacing: 1.5,
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            ⚡ Remove Watermarks
-                                        </motion.button>
-                                    )}
-                                    {phase === 'done' && resultBlob && (
-                                        <motion.button
-                                            id="download-result-btn"
-                                            onClick={downloadResult}
-                                            whileTap={{ scale: 0.97 }}
-                                            initial={{ opacity: 0, y: 6 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            style={{
-                                                flex: 1,
-                                                background: 'linear-gradient(135deg, #1a7a30, #28ca41)',
-                                                border: 'none', borderRadius: 10, padding: '14px 20px',
-                                                color: '#fff', fontFamily: 'var(--display)',
-                                                fontSize: 16, fontWeight: 600, letterSpacing: 1.5,
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            ⬇ Download Clean PNG
-                                        </motion.button>
-                                    )}
-                                </div>
+                                {phase === 'scanned' && (
+                                    <motion.button
+                                        id="start-removal-btn"
+                                        onClick={startRemoval}
+                                        whileTap={{ scale: 0.98 }}
+                                        style={{
+                                            width: '100%', padding: '13px 20px',
+                                            background: 'var(--brand)',
+                                            border: 'none', borderRadius: 10,
+                                            color: '#fff', fontFamily: 'var(--body)',
+                                            fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                                            boxShadow: 'var(--shadow-brand)',
+                                        }}
+                                    >
+                                        ✨ Remove Watermarks
+                                    </motion.button>
+                                )}
+
+                                {phase === 'done' && resultBlob && (
+                                    <motion.button
+                                        id="download-result-btn"
+                                        onClick={downloadResult}
+                                        whileTap={{ scale: 0.98 }}
+                                        initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                                        style={{
+                                            width: '100%', padding: '13px 20px',
+                                            background: '#2e7d32',
+                                            border: 'none', borderRadius: 10,
+                                            color: '#fff', fontFamily: 'var(--body)',
+                                            fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                                            boxShadow: '0 4px 16px rgba(46,125,50,0.25)',
+                                        }}
+                                    >
+                                        ⬇ Download Clean PNG
+                                    </motion.button>
+                                )}
                             </>
                         )}
                     </div>
                 </div>
 
-                {/* RIGHT — log */}
-                <div style={{ width: 340, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <div style={{ padding: '14px 24px', borderBottom: '1px solid rgba(131,27,132,0.1)', flexShrink: 0 }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#831B84', letterSpacing: 2 }}>PROCESSING LOG</span>
+                {/* Right: Log + How-it-works ──────────────────── */}
+                <div style={{ width: 320, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 20px 8px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase' as const, fontFamily: 'var(--mono)' }}>Processing Log</span>
                     </div>
 
-                    <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
                         {/* How it works */}
-                        <div style={{ marginBottom: 8 }}>
-                            <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1.5, marginBottom: 10 }}>HOW IT WORKS</p>
+                        <div style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.5, marginBottom: 10, textTransform: 'uppercase' as const, fontFamily: 'var(--mono)' }}>
+                                How It Works
+                            </div>
                             {[
                                 'Detects high-luminance watermark pixels',
                                 'Samples 10px neighborhood for each candidate',
                                 'Distance-weighted inpainting (2 passes)',
                                 'Outputs clean PNG at original resolution',
                             ].map((t, i) => (
-                                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
-                                    <span style={{ color: 'rgba(131,27,132,0.4)', fontSize: 12, flexShrink: 0, marginTop: 1 }}>{i + 1}.</span>
-                                    <span style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>{t}</span>
+                                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start' }}>
+                                    <span style={{
+                                        width: 18, height: 18, borderRadius: '50%',
+                                        background: 'var(--brand-xlight)', color: 'var(--brand)',
+                                        fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                                    }}>{i + 1}</span>
+                                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{t}</span>
                                 </div>
                             ))}
                         </div>
 
                         {/* Progress */}
                         {(phase === 'removing' || phase === 'done') && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>PROGRESS</span>
-                                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#831B84' }}>{progress}%</span>
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                style={{ padding: '14px 16px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10 }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.5, fontFamily: 'var(--mono)' }}>PROGRESS</span>
+                                    <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>{progress}%</span>
                                 </div>
-                                <div style={{ height: 6, background: 'rgba(131,27,132,0.1)', borderRadius: 3, overflow: 'hidden', marginBottom: 14 }}>
-                                    <motion.div
-                                        animate={{ width: `${progress}%` }}
-                                        transition={{ duration: 0.3 }}
-                                        style={{ height: '100%', background: 'linear-gradient(90deg, #6a1a7a, #c060c0)', borderRadius: 3 }}
-                                    />
+                                <div style={{ height: 6, background: 'var(--bg-subtle)', borderRadius: 100, overflow: 'hidden', marginBottom: 14 }}>
+                                    <motion.div animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }}
+                                        style={{ height: '100%', background: 'var(--brand)', borderRadius: 100 }} />
                                 </div>
-
-                                {/* Log lines */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                     {removalLog.map((line, i) => (
-                                        <motion.div
-                                            key={i}
-                                            initial={{ opacity: 0, x: -6 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            style={{
-                                                fontFamily: 'var(--mono)', fontSize: 12,
-                                                color: i === removalLog.length - 1 ? '#e8e8f2' : 'var(--text-muted)',
-                                                display: 'flex', alignItems: 'center', gap: 8,
-                                            }}
+                                        <motion.div key={i} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
+                                            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}
                                         >
-                                            <span style={{ color: '#831B84' }}>›</span> {line}
+                                            <span style={{ color: 'var(--brand)', fontSize: 10 }}>●</span>
+                                            <span style={{ color: i === removalLog.length - 1 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{line}</span>
                                         </motion.div>
                                     ))}
                                     {phase === 'removing' && (
-                                        <span style={{ display: 'inline-block', width: 7, height: 14, background: '#831B84', marginLeft: 22 }} className="cursor-blink" />
+                                        <span style={{ display: 'inline-block', width: 6, height: 14, background: 'var(--brand)', marginLeft: 16, opacity: 0.7 }} className="cursor-blink" />
                                     )}
                                 </div>
                             </motion.div>
@@ -486,18 +400,12 @@ export function NeuralEraser({ onClose }: NeuralEraserProps) {
 
                         {/* Done summary */}
                         {phase === 'done' && resultBlob && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                style={{
-                                    marginTop: 12, padding: '14px 16px',
-                                    background: 'rgba(40,202,65,0.06)',
-                                    border: '1px solid rgba(40,202,65,0.2)', borderRadius: 10,
-                                }}
+                            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                                style={{ padding: '14px 16px', background: 'var(--success-bg)', border: '1px solid rgba(0,137,123,0.2)', borderRadius: 10 }}
                             >
-                                <div style={{ fontSize: 14, color: '#28ca41', fontWeight: 600, marginBottom: 4 }}>✓ Processing complete</div>
-                                <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>
-                                    High-luminance watermarks removed via inpainting. Click Download to save your clean PNG.
+                                <div style={{ fontSize: 14, color: 'var(--success)', fontWeight: 600, marginBottom: 4 }}>✓ Watermarks removed</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                                    High-luminance pixels replaced via distance-weighted inpainting.
                                 </div>
                             </motion.div>
                         )}

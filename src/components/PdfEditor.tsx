@@ -511,12 +511,12 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
     /* ─── Styles ───────────────────────────────────────────────────── */
     function toolBtnStyle(active: boolean): React.CSSProperties {
         return {
-            width: 40, height: 40, borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: active ? 'rgba(131,27,132,0.4)' : 'rgba(255,255,255,0.04)',
-            color: active ? '#e8e8f2' : 'rgba(180,180,200,0.65)',
+            width: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+            background: active ? 'var(--brand-xlight)' : 'transparent',
+            color: active ? 'var(--brand)' : 'var(--text-secondary)',
             fontSize: 15,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            outline: active ? '1.5px solid rgba(131,27,132,0.7)' : 'none',
+            outline: active ? '1.5px solid var(--brand-border)' : 'none',
             transition: 'all 0.15s',
             flexShrink: 0,
             position: 'relative' as const,
@@ -525,10 +525,10 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
     function actionBtn(danger = false): React.CSSProperties {
         return {
-            padding: '6px 12px', borderRadius: 8,
-            border: `1px solid ${danger ? 'rgba(255,70,70,0.25)' : 'rgba(255,255,255,0.08)'}`,
-            background: danger ? 'rgba(255,60,60,0.07)' : 'rgba(255,255,255,0.04)',
-            color: danger ? '#ff8888' : 'rgba(180,180,210,0.8)',
+            padding: '5px 11px', borderRadius: 7,
+            border: `1px solid ${danger ? '#fed7d7' : 'var(--border)'}`,
+            background: danger ? '#fff5f5' : 'var(--bg)',
+            color: danger ? '#e53e3e' : 'var(--text-secondary)',
             fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
             fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5,
             whiteSpace: 'nowrap' as const,
@@ -555,51 +555,37 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
             style={{
                 position: 'fixed', inset: '2%', zIndex: 80,
                 display: 'flex', flexDirection: 'column',
-                background: 'rgba(8, 8, 15, 0.99)',
-                border: '1px solid rgba(131,27,132,0.25)',
-                borderRadius: 18, overflow: 'hidden',
-                boxShadow: '0 0 100px rgba(131,27,132,0.15), 0 50px 150px rgba(0,0,0,0.95)',
-                backdropFilter: 'blur(30px)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-xl)', overflow: 'hidden',
+                boxShadow: 'var(--shadow-lg)',
             }}
         >
             {/* ── Title bar ─────────────────────────────────────────── */}
             <div style={{
-                display: 'flex', alignItems: 'center', padding: '12px 20px', flexShrink: 0,
-                borderBottom: '1px solid rgba(131,27,132,0.15)',
-                background: 'rgba(131,27,132,0.04)',
-                gap: 14,
+                display: 'flex', alignItems: 'center', padding: '0 20px', height: 54, flexShrink: 0,
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--bg-card)',
+                gap: 12,
             }}>
-                {/* macOS traffic lights */}
-                <div style={{ display: 'flex', gap: 6 }}>
-                    {[['#ff5f57', onClose], ['#ffbd2e', null], ['#28ca41', null]].map(([bg, action], i) => (
-                        <button
-                            key={i}
-                            onClick={action as (() => void) || undefined}
-                            style={{
-                                width: 13, height: 13, borderRadius: '50%',
-                                background: bg as string, border: 'none',
-                                cursor: action ? 'pointer' : 'default', padding: 0,
-                            }}
-                        />
-                    ))}
-                </div>
-
-                <div style={{ width: 1, height: 18, background: 'rgba(131,27,132,0.2)' }} />
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15 }}>📄</span>
-                    <span style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 700, color: '#e0e0f0', letterSpacing: 1 }}>
-                        PDF Editor
-                    </span>
+                {/* Icon + title */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{
+                        width: 30, height: 30, borderRadius: 8,
+                        background: 'linear-gradient(135deg, #d32f2f, #e53935)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0,
+                    }}>📄</div>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>PDF Editor</span>
                     {fileName && (
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'rgba(131,27,132,0.6)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            — {fileName}
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            · {fileName}
                         </span>
                     )}
                 </div>
 
                 {numPages > 0 && (
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'rgba(131,27,132,0.5)', marginLeft: 4 }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
                         {numPages} pages
                     </span>
                 )}
@@ -609,7 +595,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                     {exportMsg && (
                         <motion.span
                             initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                            style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#6bcb77', marginLeft: 8 }}
+                            style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--success)', marginLeft: 8 }}
                         >
                             {exportMsg}
                         </motion.span>
@@ -618,71 +604,57 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
                 <div style={{ flex: 1 }} />
 
-                {/* Keyboard shortcut hint */}
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'rgba(131,27,132,0.35)' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)' }}>
                     Ctrl+Z undo · Ctrl+Y redo
                 </span>
 
-                {/* Close X */}
+                {/* Close */}
                 <button
                     onClick={onClose}
                     style={{
-                        width: 34, height: 34, borderRadius: 9, border: '1px solid rgba(255,255,255,0.07)',
-                        background: 'transparent', color: 'rgba(180,180,200,0.5)',
-                        cursor: 'pointer', fontSize: 16,
+                        width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)',
+                        background: 'transparent', color: 'var(--text-muted)',
+                        cursor: 'pointer', fontSize: 15,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,80,80,0.15)'; e.currentTarget.style.color = '#ff7070'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(180,180,200,0.5)'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#fff5f5'; e.currentTarget.style.color = '#e53e3e'; e.currentTarget.style.borderColor = '#fed7d7'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
                 >✕</button>
             </div>
 
             {/* ── Drop zone (no PDF loaded) ──────────────────────────── */}
             {!pdfDoc && (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
                     <motion.div
-                        animate={isDragOver ? { scale: 1.03, borderColor: '#831B84' } : { scale: 1, borderColor: 'rgba(131,27,132,0.3)' }}
+                        animate={isDragOver ? { scale: 1.02, borderColor: 'var(--brand)' } : { scale: 1, borderColor: 'var(--border-strong)' }}
                         transition={{ duration: 0.2 }}
                         onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
                         onDragLeave={() => setIsDragOver(false)}
-                        onDrop={e => {
-                            e.preventDefault(); setIsDragOver(false);
-                            const f = e.dataTransfer.files[0];
-                            if (f) loadPdf(f);
-                        }}
+                        onDrop={e => { e.preventDefault(); setIsDragOver(false); const f = e.dataTransfer.files[0]; if (f) loadPdf(f); }}
                         onClick={() => fileInputRef.current?.click()}
                         style={{
-                            width: 500, maxWidth: '90%',
-                            padding: '70px 50px',
-                            border: '2px dashed rgba(131,27,132,0.3)',
-                            borderRadius: 20, cursor: 'pointer', textAlign: 'center',
-                            background: isDragOver ? 'rgba(131,27,132,0.06)' : 'transparent',
-                            transition: 'background 0.2s',
+                            width: 460, maxWidth: '90%', padding: '60px 48px',
+                            border: '2px dashed var(--border-strong)', borderRadius: 'var(--radius-xl)',
+                            cursor: 'pointer', textAlign: 'center',
+                            background: isDragOver ? 'var(--brand-xlight)' : 'var(--bg-card)',
+                            boxShadow: 'var(--shadow-sm)',
+                            transition: 'all 0.2s',
                         }}
                     >
-                        <input
-                            ref={fileInputRef} type="file" accept="application/pdf"
-                            style={{ display: 'none' }}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) loadPdf(f); }}
-                        />
-                        {loading ? (
-                            <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                                style={{ fontSize: 48, display: 'inline-block', marginBottom: 20 }}
-                            >⟳</motion.div>
-                        ) : (
-                            <div style={{ fontSize: 64, marginBottom: 20, opacity: isDragOver ? 0.9 : 0.4 }}>📄</div>
-                        )}
-                        <div style={{ fontSize: 20, color: isDragOver ? '#e0e0f2' : 'rgba(180,180,210,0.8)', fontWeight: 600, marginBottom: 10 }}>
-                            {loading ? 'Loading PDF…' : 'Drop a PDF here or click to browse'}
+                        <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) loadPdf(f); }} />
+                        <div style={{ fontSize: 56, marginBottom: 18, opacity: isDragOver ? 0.9 : 0.5 }}>{loading ? '⏳' : '📄'}</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: isDragOver ? 'var(--brand)' : 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.3px' }}>
+                            {loading ? 'Loading PDF…' : 'Drop a PDF here'}
                         </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'rgba(131,27,132,0.45)' }}>
-                            Supports multi-page PDFs · All editing is in-browser · No upload required
+                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                            Or <span style={{ color: 'var(--brand)', fontWeight: 600 }}>click to browse</span> your files
+                        </div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>
+                            Multi-page PDFs · All in-browser · No upload
                         </div>
                         {loadError && (
-                            <div style={{ marginTop: 16, fontFamily: 'var(--mono)', fontSize: 12, color: '#ff8888', background: 'rgba(255,80,80,0.07)', padding: '8px 14px', borderRadius: 8 }}>
+                            <div style={{ marginTop: 16, fontSize: 13, color: 'var(--error)', background: 'var(--error-bg)', padding: '8px 14px', borderRadius: 8 }}>
                                 {loadError}
                             </div>
                         )}
@@ -696,9 +668,9 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
                     {/* ── Left tool sidebar ── */}
                     <div style={{
-                        width: 56, borderRight: '1px solid rgba(131,27,132,0.12)',
+                        width: 52, borderRight: '1px solid var(--border)',
                         display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        padding: '12px 8px', gap: 6, background: 'rgba(5,5,12,0.8)',
+                        padding: '10px 8px', gap: 4, background: 'var(--bg-card)',
                         flexShrink: 0, overflowY: 'auto',
                     }}>
                         {TOOLS.map(t => (
@@ -713,7 +685,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                         ))}
 
                         {/* Divider */}
-                        <div style={{ width: 28, height: 1, background: 'rgba(131,27,132,0.2)', margin: '6px 0' }} />
+                        <div style={{ width: 28, height: 1, background: 'var(--border)', margin: '6px 0' }} />
 
                         {/* Color dots */}
                         {COLORS.map(c => (
@@ -721,10 +693,11 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                 key={c}
                                 onClick={() => setColor(c)}
                                 style={{
-                                    width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                                    background: c, border: color === c ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.12)',
+                                    width: 22, height: 22, borderRadius: 5, flexShrink: 0,
+                                    background: c,
+                                    border: color === c ? '2.5px solid var(--brand)' : `2px solid ${c === '#ffffff' ? 'var(--border)' : 'transparent'}`,
                                     cursor: 'pointer', transition: 'transform 0.12s',
-                                    transform: color === c ? 'scale(1.18)' : 'scale(1)',
+                                    transform: color === c ? 'scale(1.2)' : 'scale(1)',
                                 }}
                             />
                         ))}
@@ -733,42 +706,41 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                         <input
                             type="color" value={color} onChange={e => setColor(e.target.value)}
                             title="Custom color"
-                            style={{ width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer', padding: 0, background: 'none' }}
+                            style={{ width: 26, height: 26, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', padding: 0 }}
                         />
 
                         {/* Divider */}
-                        <div style={{ width: 28, height: 1, background: 'rgba(131,27,132,0.2)', margin: '4px 0' }} />
+                        <div style={{ width: 28, height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
-                        {/* Stroke width indicator */}
-                        <div style={{ textAlign: 'center', fontSize: 9, color: 'rgba(131,27,132,0.5)', fontFamily: 'var(--mono)' }}>W</div>
+                        <div style={{ textAlign: 'center', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>W</div>
                         <input
                             type="range" min={1} max={24} value={lineWidth}
                             onChange={e => setLineWidth(+e.target.value)}
                             style={{
                                 writingMode: 'vertical-lr' as React.CSSProperties['writingMode'],
                                 direction: 'rtl',
-                                width: 6, height: 80,
-                                accentColor: '#831B84', cursor: 'pointer',
+                                width: 6, height: 70,
+                                accentColor: 'var(--brand)', cursor: 'pointer',
                             }}
-                            title={`Stroke width: ${lineWidth}`}
+                            title={`Stroke: ${lineWidth}`}
                         />
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: '#831B84' }}>{lineWidth}</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--brand)' }}>{lineWidth}</span>
 
                         {tool === 'text' && (
                             <>
-                                <div style={{ width: 28, height: 1, background: 'rgba(131,27,132,0.2)', margin: '4px 0' }} />
-                                <div style={{ textAlign: 'center', fontSize: 9, color: 'rgba(131,27,132,0.5)', fontFamily: 'var(--mono)' }}>Sz</div>
+                                <div style={{ width: 28, height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                                <div style={{ textAlign: 'center', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>Sz</div>
                                 <input
                                     type="range" min={10} max={72} value={fontSize}
                                     onChange={e => setFontSize(+e.target.value)}
                                     style={{
                                         writingMode: 'vertical-lr' as React.CSSProperties['writingMode'],
                                         direction: 'rtl',
-                                        width: 6, height: 70,
-                                        accentColor: '#831B84', cursor: 'pointer',
+                                        width: 6, height: 60,
+                                        accentColor: 'var(--brand)', cursor: 'pointer',
                                     }}
                                 />
-                                <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: '#831B84' }}>{fontSize}</span>
+                                <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--brand)' }}>{fontSize}</span>
                             </>
                         )}
                     </div>
@@ -776,10 +748,10 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                     {/* ── Thumbnail sidebar ── */}
                     {showThumbs && (
                         <div style={{
-                            width: 120, borderRight: '1px solid rgba(131,27,132,0.1)',
-                            overflowY: 'auto', padding: '10px 8px',
-                            display: 'flex', flexDirection: 'column', gap: 8,
-                            flexShrink: 0, background: 'rgba(4,4,10,0.7)',
+                            width: 110, borderRight: '1px solid var(--border)',
+                            overflowY: 'auto', padding: '8px 6px',
+                            display: 'flex', flexDirection: 'column', gap: 6,
+                            flexShrink: 0, background: 'var(--bg)',
                         }}>
                             {Array.from({ length: numPages }, (_, idx) => idx + 1).map(n => (
                                 <div
@@ -787,18 +759,18 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                     onClick={() => setCurrentPage(n)}
                                     style={{
                                         cursor: 'pointer', borderRadius: 6, overflow: 'hidden',
-                                        border: `2px solid ${n === currentPage ? '#831B84' : 'rgba(131,27,132,0.1)'}`,
+                                        border: `2px solid ${n === currentPage ? 'var(--brand)' : 'var(--border)'}`,
                                         transition: 'border-color 0.15s',
-                                        background: '#111', position: 'relative', flexShrink: 0,
-                                        boxShadow: n === currentPage ? '0 0 12px rgba(131,27,132,0.3)' : 'none',
+                                        background: '#fff', position: 'relative', flexShrink: 0,
+                                        boxShadow: n === currentPage ? 'var(--shadow-brand)' : 'var(--shadow-sm)',
                                     }}
                                 >
                                     <canvas ref={el => { thumbRefs.current[n - 1] = el; }} style={{ width: '100%', display: 'block' }} />
                                     <div style={{
                                         position: 'absolute', bottom: 2, right: 3,
                                         fontFamily: 'var(--mono)', fontSize: 8,
-                                        color: n === currentPage ? '#c060d0' : 'rgba(150,150,170,0.5)',
-                                        background: 'rgba(0,0,0,0.6)', padding: '1px 4px', borderRadius: 3,
+                                        color: n === currentPage ? 'var(--brand)' : 'var(--text-muted)',
+                                        background: 'rgba(255,255,255,0.9)', padding: '1px 4px', borderRadius: 3,
                                     }}>{n}</div>
                                 </div>
                             ))}
@@ -810,10 +782,10 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
                         {/* Top toolbar */}
                         <div style={{
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '8px 14px', flexShrink: 0,
-                            borderBottom: '1px solid rgba(131,27,132,0.12)',
-                            background: 'rgba(6,6,14,0.95)',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '7px 12px', flexShrink: 0,
+                            borderBottom: '1px solid var(--border)',
+                            background: 'var(--bg-card)',
                             overflowX: 'auto',
                         }}>
                             {/* Page nav */}
@@ -828,15 +800,15 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                     type="number" min={1} max={numPages} value={currentPage}
                                     onChange={e => setCurrentPage(Math.max(1, Math.min(numPages, +e.target.value)))}
                                     style={{
-                                        width: 44, textAlign: 'center',
-                                        background: 'rgba(131,27,132,0.1)',
-                                        border: '1px solid rgba(131,27,132,0.22)',
-                                        borderRadius: 7, padding: '4px 6px',
-                                        color: '#e0e0f0', fontFamily: 'var(--mono)',
+                                        width: 42, textAlign: 'center',
+                                        background: 'var(--bg)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: 6, padding: '4px 6px',
+                                        color: 'var(--text-primary)', fontFamily: 'var(--mono)',
                                         fontSize: 12, outline: 'none',
                                     }}
                                 />
-                                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'rgba(131,27,132,0.55)' }}>/ {numPages}</span>
+                                <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-muted)' }}>/ {numPages}</span>
                             </div>
 
                             <button
@@ -845,24 +817,24 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                 style={{ ...actionBtn(), opacity: currentPage >= numPages ? 0.3 : 1 }}
                             >Next ›</button>
 
-                            <div style={{ width: 1, height: 24, background: 'rgba(131,27,132,0.18)', flexShrink: 0 }} />
+                            <div style={{ width: 1, height: 22, background: 'var(--border)', flexShrink: 0 }} />
 
                             {/* Zoom */}
                             <button onClick={() => setZoom(z => Math.max(0.4, z - 0.15))} style={actionBtn()}>−</button>
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'rgba(131,27,132,0.6)', minWidth: 40, textAlign: 'center' }}>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)', minWidth: 40, textAlign: 'center' }}>
                                 {Math.round(zoom * 100)}%
                             </span>
                             <button onClick={() => setZoom(z => Math.min(4, z + 0.15))} style={actionBtn()}>+</button>
                             <button onClick={() => setZoom(1.3)} style={actionBtn()} title="Reset zoom">⟳</button>
 
-                            <div style={{ width: 1, height: 24, background: 'rgba(131,27,132,0.18)', flexShrink: 0 }} />
+                            <div style={{ width: 1, height: 22, background: 'var(--border)', flexShrink: 0 }} />
 
                             {/* Undo / Redo */}
                             <button onClick={undo} disabled={!undoStack.length} style={{ ...actionBtn(), opacity: !undoStack.length ? 0.3 : 1 }} title="Undo (Ctrl+Z)">↩ Undo</button>
                             <button onClick={redo} disabled={!redoStack.length} style={{ ...actionBtn(), opacity: !redoStack.length ? 0.3 : 1 }} title="Redo (Ctrl+Y)">↪ Redo</button>
                             <button onClick={clearPage} style={actionBtn(true)} title="Clear all annotations on this page">🗑 Clear</button>
 
-                            <div style={{ width: 1, height: 24, background: 'rgba(131,27,132,0.18)', flexShrink: 0 }} />
+                            <div style={{ width: 1, height: 22, background: 'var(--border)', flexShrink: 0 }} />
 
                             {/* Export */}
                             <button onClick={exportCurrentPage} style={actionBtn()} title="Export this page as PNG">⬇ Page PNG</button>
@@ -876,7 +848,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                 onChange={e => { const f = e.target.files?.[0]; if (f) loadPdf(f); }}
                             />
 
-                            <div style={{ width: 1, height: 24, background: 'rgba(131,27,132,0.18)', flexShrink: 0 }} />
+                            <div style={{ width: 1, height: 22, background: 'var(--border)', flexShrink: 0 }} />
 
                             {/* Toggle thumbnails */}
                             <button onClick={() => setShowThumbs(v => !v)} style={actionBtn()}>
@@ -888,8 +860,10 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                         <div style={{
                             flex: 1, overflow: 'auto',
                             display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-                            padding: '24px',
-                            background: 'rgba(4,4,10,0.7)',
+                            padding: '28px',
+                            background: 'var(--bg-subtle)',
+                            backgroundImage: 'radial-gradient(circle, #c8cde0 1px, transparent 1px)',
+                            backgroundSize: '24px 24px',
                         }}>
                             <div style={{ position: 'relative', boxShadow: '0 12px 60px rgba(0,0,0,0.8)', borderRadius: 4, overflow: 'hidden', flexShrink: 0 }}>
                                 {/* PDF layer */}
@@ -937,21 +911,20 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
                         {/* Status bar */}
                         <div style={{
-                            padding: '6px 16px',
+                            padding: '5px 16px',
                             display: 'flex', alignItems: 'center', gap: 16,
-                            borderTop: '1px solid rgba(131,27,132,0.1)',
-                            background: 'rgba(4,4,10,0.9)',
+                            borderTop: '1px solid var(--border)',
+                            background: 'var(--bg-card)',
                             fontSize: 11, fontFamily: 'var(--mono)',
-                            color: 'rgba(131,27,132,0.45)',
+                            color: 'var(--text-muted)',
                             flexShrink: 0,
                         }}>
-                            <span>Tool: <span style={{ color: '#9040a8' }}>{tool.toUpperCase()}</span></span>
-                            <span>Color: <span style={{ color }}>{color}</span></span>
-                            <span>Stroke: <span style={{ color: '#9040a8' }}>{lineWidth}px</span></span>
-                            {tool === 'text' && <span>Font: <span style={{ color: '#9040a8' }}>{fontSize}px</span></span>}
-                            <span>Zoom: <span style={{ color: '#9040a8' }}>{Math.round(zoom * 100)}%</span></span>
-                            <span>Page: <span style={{ color: '#9040a8' }}>{currentPage}/{numPages}</span></span>
-                            <span style={{ marginLeft: 'auto' }}>Annotations on page: <span style={{ color: '#9040a8' }}>{(annotations[currentPage] ?? []).length}</span></span>
+                            <span>Tool: <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{tool.toUpperCase()}</span></span>
+                            <span>Stroke: <span style={{ color: 'var(--text-secondary)' }}>{lineWidth}px</span></span>
+                            {tool === 'text' && <span>Font: <span style={{ color: 'var(--text-secondary)' }}>{fontSize}px</span></span>}
+                            <span>Zoom: <span style={{ color: 'var(--text-secondary)' }}>{Math.round(zoom * 100)}%</span></span>
+                            <span>Page: <span style={{ color: 'var(--text-secondary)' }}>{currentPage}/{numPages}</span></span>
+                            <span style={{ marginLeft: 'auto' }}>Annotations: <span style={{ color: 'var(--brand)' }}>{(annotations[currentPage] ?? []).length}</span></span>
                         </div>
                     </div>
                 </div>
