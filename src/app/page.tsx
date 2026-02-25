@@ -65,14 +65,15 @@ export default function LabOS() {
         overflow: 'hidden',
       }}
     >
-      {/* ── Subtle grid background ────────────────────────────────────────── */}
+      {/* ── Subtle dot background ─────────────────────────────────────────── */}
       <div
         aria-hidden="true"
         style={{
           position: 'fixed',
           inset: 0,
-          backgroundImage: 'linear-gradient(rgba(131,27,132,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(131,27,132,0.04) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
+          backgroundImage: 'radial-gradient(circle, #d1d5e8 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+          opacity: 0.55,
           pointerEvents: 'none',
           zIndex: 1,
         }}

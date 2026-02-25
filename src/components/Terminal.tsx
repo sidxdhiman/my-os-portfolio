@@ -221,7 +221,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
         const parts = text.split(/(\x1b\[\d+m)/);
         let currentColor = 'inherit';
         return parts.map((part, i) => {
-            if (part === '\x1b[35m') { currentColor = '#a020a2'; return null; }
+            if (part === '\x1b[35m') { currentColor = '#9b59d0'; return null; }
             if (part === '\x1b[0m') { currentColor = 'inherit'; return null; }
             return <span key={i} style={{ color: currentColor }}>{part}</span>;
         });
@@ -246,11 +246,11 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         zIndex: 100,
                         display: 'flex',
                         flexDirection: 'column',
-                        background: 'rgba(7, 7, 14, 0.97)',
-                        border: '1px solid rgba(131, 27, 132, 0.35)',
-                        borderRadius: 14,
-                        boxShadow: '0 0 60px rgba(131,27,132,0.18), 0 24px 80px rgba(0,0,0,0.85)',
-                        backdropFilter: 'blur(28px)',
+                        background: '#13111a',
+                        border: '1px solid rgba(98,0,234,0.3)',
+                        borderRadius: 16,
+                        boxShadow: '0 8px 40px rgba(0,0,0,0.45), 0 2px 0 rgba(98,0,234,0.2)',
+                        backdropFilter: 'blur(20px)',
                         overflow: 'hidden',
                     }}
                     onClick={() => inputRef.current?.focus()}
@@ -261,15 +261,15 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '12px 18px',
-                        background: 'rgba(131, 27, 132, 0.07)',
-                        borderBottom: '1px solid rgba(131, 27, 132, 0.18)',
+                        background: 'rgba(98,0,234,0.07)',
+                        borderBottom: '1px solid rgba(98,0,234,0.18)',
                         flexShrink: 0,
                     }}>
                         <div style={{ display: 'flex', gap: 8 }}>
                             <button style={{ width: 14, height: 14, borderRadius: '50%', background: '#ff5f57', border: 'none', cursor: 'pointer', padding: 0 }} onClick={onClose} />
                             <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#ffbd2e' }} />
                             <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#28ca41' }} />
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#831B84', letterSpacing: 1.5, marginLeft: 10 }}>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#9b59d0', letterSpacing: 1, marginLeft: 10 }}>
                                 LAB-SHELL — {user?.name ?? 'GUEST'}
                             </span>
                         </div>
@@ -281,7 +281,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                 width: 32,
                                 height: 6,
                                 borderRadius: 3,
-                                background: 'rgba(131, 27, 132, 0.4)',
+                                background: 'rgba(98,0,234,0.35)',
                                 cursor: 'ns-resize',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -303,7 +303,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                 window.addEventListener('mouseup', onUp);
                             }}
                         >
-                            <div style={{ width: 20, height: 2, borderRadius: 1, background: 'rgba(131,27,132,0.8)' }} />
+                            <div style={{ width: 20, height: 2, borderRadius: 1, background: 'rgba(98,0,234,0.8)' }} />
                         </div>
                     </div>
 
@@ -326,12 +326,12 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                 style={{
                                     animationDelay: `${Math.min(i * 10, 100)}ms`,
                                     color: line.type === 'input'
-                                        ? '#a060c0'
+                                        ? '#b794f4'
                                         : line.type === 'error'
-                                            ? '#ff6b6b'
+                                            ? '#fc8181'
                                             : line.type === 'system'
-                                                ? 'rgba(131,27,132,0.8)'
-                                                : 'var(--text-secondary)',
+                                                ? '#9b59d0'
+                                                : '#c4c4d4',
                                     whiteSpace: 'pre',
                                 }}
                             >
@@ -342,8 +342,8 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         {/* Interactive menu overlay */}
                         {showMenu && (
                             <div style={{
-                                background: 'rgba(131, 27, 132, 0.08)',
-                                border: '1px solid rgba(131, 27, 132, 0.3)',
+                                background: 'rgba(98,0,234,0.08)',
+                                border: '1px solid rgba(98,0,234,0.25)',
                                 borderRadius: 6,
                                 overflow: 'hidden',
                                 margin: '4px 0',
@@ -356,7 +356,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                             alignItems: 'center',
                                             gap: 12,
                                             padding: '8px 14px',
-                                            background: i === menuIdx ? 'rgba(131, 27, 132, 0.25)' : 'transparent',
+                                            background: i === menuIdx ? 'rgba(98,0,234,0.2)' : 'transparent',
                                             cursor: 'pointer',
                                             transition: 'background 0.15s',
                                         }}
@@ -367,7 +367,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                             setInput('');
                                         }}
                                     >
-                                        <span style={{ color: i === menuIdx ? '#ff88ff' : '#831B84' }}>
+                                        <span style={{ color: i === menuIdx ? '#c084fc' : '#7c3aed' }}>
                                             {i === menuIdx ? '▶' : ' '}
                                         </span>
                                         <span style={{ color: i === menuIdx ? '#e8e8f0' : 'var(--text-secondary)', fontWeight: i === menuIdx ? 600 : 400 }}>
@@ -388,11 +388,11 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                         alignItems: 'center',
                         gap: 8,
                         padding: '12px 20px',
-                        borderTop: '1px solid rgba(131, 27, 132, 0.18)',
-                        background: 'rgba(131, 27, 132, 0.04)',
+                        borderTop: '1px solid rgba(98,0,234,0.15)',
+                        background: 'rgba(98,0,234,0.04)',
                         flexShrink: 0,
                     }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 14, color: '#831B84' }}>lab@os:~$</span>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 14, color: '#9b59d0' }}>lab@os:~$</span>
                         <input
                             ref={inputRef}
                             id="terminal-input"
@@ -404,10 +404,10 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
                                 background: 'transparent',
                                 border: 'none',
                                 outline: 'none',
-                                color: '#e8e8f0',
+                                color: '#e2e0f0',
                                 fontFamily: 'var(--mono)',
                                 fontSize: 14,
-                                caretColor: '#831B84',
+                                caretColor: '#9b59d0',
                             }}
                             autoComplete="off"
                             spellCheck={false}

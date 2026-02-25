@@ -9,221 +9,202 @@ interface IdEntryProps {
     setPhase: (p: OSState['phase']) => void;
 }
 
-const ACCESS_LEVELS = ['RESEARCHER', 'DEVELOPER', 'ARCHITECT', 'ROOT'];
+const ROLES = ['Researcher', 'Developer', 'Architect', 'Root'];
 
 export function IdEntry({ setUser, setPhase }: IdEntryProps) {
     const [name, setName] = useState('');
-    const [level, setLevel] = useState('DEVELOPER');
+    const [role, setRole] = useState('Developer');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    function handleIssue() {
-        if (!name.trim()) {
-            setError('Subject name is required');
-            return;
-        }
+    function handleSubmit() {
+        if (!name.trim()) { setError('Please enter your name to continue.'); return; }
         setError('');
         setLoading(true);
-
         const userData: LabUser = {
-            name: name.trim().toUpperCase(),
-            accessLevel: level,
+            name: name.trim(),
+            accessLevel: role.toUpperCase(),
             issuedAt: new Date().toISOString(),
         };
-
         setTimeout(() => {
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('lab_user', JSON.stringify(userData));
-            }
+            if (typeof window !== 'undefined') localStorage.setItem('lab_user', JSON.stringify(userData));
             setUser(userData);
             setPhase('id-scan');
             setLoading(false);
-        }, 600);
+        }, 500);
     }
 
     return (
-        /* Static centering wrapper — keeps translate(-50%,-50%) away from Framer Motion's transform pipeline */
         <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10,
-            padding: '0 16px',
-            pointerEvents: 'none',
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 10, padding: '0 16px',
         }}>
             <motion.div
-                initial={{ opacity: 0, scale: 0.93, y: 24 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: -16 }}
-                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                style={{
-                    width: '100%',
-                    maxWidth: 420,
-                    pointerEvents: 'auto',
-                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                style={{ width: '100%', maxWidth: 420 }}
             >
+                {/* Card */}
                 <div style={{
-                    background: 'rgba(10, 10, 16, 0.97)',
-                    border: '1px solid rgba(131, 27, 132, 0.4)',
-                    borderRadius: 12,
-                    padding: '36px 32px 32px',
-                    boxShadow: '0 0 60px rgba(131, 27, 132, 0.2), inset 0 1px 0 rgba(131, 27, 132, 0.2)',
-                    backdropFilter: 'blur(20px)',
-                    position: 'relative',
-                    overflow: 'hidden',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-xl)',
+                    padding: '40px 36px 36px',
+                    boxShadow: 'var(--shadow-lg)',
                 }}>
-                    {/* Corner decorations */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: 20, height: 20, borderTop: '2px solid #831B84', borderLeft: '2px solid #831B84' }} />
-                    <div style={{ position: 'absolute', top: 0, right: 0, width: 20, height: 20, borderTop: '2px solid #831B84', borderRight: '2px solid #831B84' }} />
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, width: 20, height: 20, borderBottom: '2px solid #831B84', borderLeft: '2px solid #831B84' }} />
-                    <div style={{ position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderBottom: '2px solid #831B84', borderRight: '2px solid #831B84' }} />
-
-                    {/* Header */}
-                    <div style={{ textAlign: 'center', marginBottom: 28 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#831B84', boxShadow: '0 0 10px #831B84' }} className="pulse-dot" />
-                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#831B84', letterSpacing: 3 }}>LABORATORY OS</span>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#831B84', boxShadow: '0 0 10px #831B84' }} className="pulse-dot" />
+                    {/* Logo mark */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+                        <div style={{
+                            width: 36, height: 36, borderRadius: 10,
+                            background: 'linear-gradient(135deg, #6200ea, #9c27b0)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(98,0,234,0.25)',
+                        }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
                         </div>
-                        <h1 style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 900, letterSpacing: 2, color: '#e8e8f0', lineHeight: 1.2 }}>
-                            BIOMETRIC INIT
-                        </h1>
-                        <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 6, letterSpacing: 1 }}>
-                            SUBJECT IDENTIFICATION REQUIRED
-                        </p>
+                        <div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Dev Lab</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--mono)' }}>sidharth.dev</div>
+                        </div>
                     </div>
 
-                    {/* Divider */}
-                    <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(131,27,132,0.5), transparent)', marginBottom: 28 }} />
+                    <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, letterSpacing: '-0.5px' }}>
+                        Sign in to your lab
+                    </h1>
+                    <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 28, lineHeight: 1.5 }}>
+                        Enter your name to access the interactive portfolio tools.
+                    </p>
 
-                    {/* Form */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                        <div>
-                            <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: '#831B84', letterSpacing: 2, marginBottom: 8 }}>
-                                {'>'} SUBJECT_NAME
-                            </label>
-                            <input
-                                id="subject-name-input"
-                                type="text"
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleIssue()}
-                                placeholder="Enter your identifier..."
-                                autoFocus
-                                style={{
-                                    width: '100%',
-                                    background: 'rgba(131, 27, 132, 0.06)',
-                                    border: '1px solid rgba(131, 27, 132, 0.35)',
-                                    borderRadius: 6,
-                                    padding: '11px 14px',
-                                    color: '#e8e8f0',
-                                    fontFamily: 'var(--mono)',
-                                    fontSize: 14,
-                                    outline: 'none',
-                                    transition: 'border-color 0.2s, box-shadow 0.2s',
-                                    letterSpacing: 1,
-                                }}
-                                onFocus={e => {
-                                    e.target.style.borderColor = '#831B84';
-                                    e.target.style.boxShadow = '0 0 16px rgba(131,27,132,0.25)';
-                                }}
-                                onBlur={e => {
-                                    e.target.style.borderColor = 'rgba(131, 27, 132, 0.35)';
-                                    e.target.style.boxShadow = 'none';
-                                }}
-                            />
-                        </div>
-
-                        <div>
-                            <label style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10, color: '#831B84', letterSpacing: 2, marginBottom: 8 }}>
-                                {'>'} ACCESS_LEVEL
-                            </label>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                {ACCESS_LEVELS.map(lvl => (
-                                    <button
-                                        key={lvl}
-                                        onClick={() => setLevel(lvl)}
-                                        style={{
-                                            background: level === lvl ? 'rgba(131, 27, 132, 0.25)' : 'rgba(131, 27, 132, 0.04)',
-                                            border: `1px solid ${level === lvl ? '#831B84' : 'rgba(131, 27, 132, 0.2)'}`,
-                                            borderRadius: 6,
-                                            padding: '8px 12px',
-                                            color: level === lvl ? '#e8e8f0' : 'var(--text-muted)',
-                                            fontFamily: 'var(--mono)',
-                                            fontSize: 11,
-                                            letterSpacing: 1.5,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            boxShadow: level === lvl ? '0 0 12px rgba(131,27,132,0.3)' : 'none',
-                                        }}
-                                    >
-                                        {lvl}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
+                    {/* Name field */}
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                            Your Name
+                        </label>
+                        <input
+                            id="subject-name-input"
+                            type="text"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                            placeholder="e.g. Sidharth"
+                            autoFocus
+                            style={{
+                                width: '100%',
+                                background: 'var(--bg)',
+                                border: `1.5px solid ${error ? 'var(--error)' : 'var(--border-strong)'}`,
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '10px 14px',
+                                color: 'var(--text-primary)',
+                                fontFamily: 'var(--body)',
+                                fontSize: 15,
+                                outline: 'none',
+                                transition: 'border-color 0.2s, box-shadow 0.2s',
+                            }}
+                            onFocus={e => {
+                                e.target.style.borderColor = 'var(--brand)';
+                                e.target.style.boxShadow = '0 0 0 3px rgba(98,0,234,0.12)';
+                            }}
+                            onBlur={e => {
+                                e.target.style.borderColor = error ? 'var(--error)' : 'var(--border-strong)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        />
                         {error && (
-                            <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#ff6b6b', letterSpacing: 1 }}>
-                                ⚠ {error}
+                            <p style={{ fontSize: 12, color: 'var(--error)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>⚠</span> {error}
                             </p>
                         )}
-
-                        <motion.button
-                            id="issue-access-btn"
-                            onClick={handleIssue}
-                            disabled={loading}
-                            whileTap={{ scale: 0.97 }}
-                            style={{
-                                marginTop: 4,
-                                width: '100%',
-                                background: loading
-                                    ? 'rgba(131, 27, 132, 0.2)'
-                                    : 'linear-gradient(135deg, #831B84, #a020a2)',
-                                border: '1px solid rgba(131, 27, 132, 0.6)',
-                                borderRadius: 8,
-                                padding: '13px 24px',
-                                color: '#fff',
-                                fontFamily: 'var(--display)',
-                                fontSize: 13,
-                                fontWeight: 700,
-                                letterSpacing: 3,
-                                cursor: loading ? 'not-allowed' : 'pointer',
-                                boxShadow: loading ? 'none' : '0 0 24px rgba(131, 27, 132, 0.5)',
-                                transition: 'all 0.3s',
-                            }}
-                        >
-                            {loading ? (
-                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                    <span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                                    PROCESSING...
-                                </span>
-                            ) : (
-                                '◈ ISSUE ACCESS CARD'
-                            )}
-                        </motion.button>
                     </div>
 
+                    {/* Role selector */}
+                    <div style={{ marginBottom: 24 }}>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            Role
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            {ROLES.map(r => (
+                                <button
+                                    key={r}
+                                    onClick={() => setRole(r)}
+                                    style={{
+                                        background: role === r ? 'var(--brand-xlight)' : 'var(--bg)',
+                                        border: `1.5px solid ${role === r ? 'var(--brand)' : 'var(--border)'}`,
+                                        borderRadius: 'var(--radius-sm)',
+                                        padding: '8px 12px',
+                                        color: role === r ? 'var(--brand)' : 'var(--text-secondary)',
+                                        fontFamily: 'var(--body)',
+                                        fontSize: 13,
+                                        fontWeight: role === r ? 600 : 400,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s',
+                                        textAlign: 'left' as const,
+                                        display: 'flex', alignItems: 'center', gap: 7,
+                                    }}
+                                >
+                                    <span style={{
+                                        width: 14, height: 14, borderRadius: '50%',
+                                        border: `2px solid ${role === r ? 'var(--brand)' : 'var(--border-strong)'}`,
+                                        background: role === r ? 'var(--brand)' : 'transparent',
+                                        flexShrink: 0, position: 'relative',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        {role === r && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'white', display: 'block' }} />}
+                                    </span>
+                                    {r}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Submit */}
+                    <motion.button
+                        id="issue-access-btn"
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        whileTap={{ scale: 0.98 }}
+                        style={{
+                            width: '100%',
+                            background: loading ? '#c4a8f0' : 'var(--brand)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '12px 24px',
+                            color: '#fff',
+                            fontFamily: 'var(--body)',
+                            fontSize: 15,
+                            fontWeight: 600,
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            boxShadow: loading ? 'none' : 'var(--shadow-brand)',
+                            transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        }}
+                    >
+                        {loading ? (
+                            <>
+                                <span style={{ width: 16, height: 16, border: '2.5px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                                Signing in…
+                            </>
+                        ) : (
+                            'Continue to Lab →'
+                        )}
+                    </motion.button>
+
                     {/* Footer */}
-                    <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 1 }}>
-                            LAB_OS v3.7.1
-                        </span>
-                        <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text-muted)', letterSpacing: 1 }}>
-                            SECURE CHANNEL ✓
-                        </span>
+                    <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-muted)' }}>v3.7 · Local-only · No data sent</span>
                     </div>
                 </div>
 
-                <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+                {/* Tagline below card */}
+                <p style={{ textAlign: 'center', marginTop: 18, fontSize: 12, color: 'var(--text-muted)' }}>
+                    Built by Sidharth · Interactive portfolio tools
+                </p>
             </motion.div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 }
-

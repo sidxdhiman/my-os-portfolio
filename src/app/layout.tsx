@@ -2,28 +2,24 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Laboratory OS — Sidharth\'s Digital Lab',
-  description: 'An immersive portfolio OS with biometric access, neural eraser, and lab-grade developer tools.',
-  keywords: ['portfolio', 'developer', 'laboratory', 'neural', 'OS', 'Sidharth'],
+  title: 'Dev Lab — Sidharth\'s Portfolio',
+  description: 'An interactive developer portfolio with live tools: PDF editor, whiteboard, neural eraser, and more.',
+  keywords: ['portfolio', 'developer', 'lab', 'tools', 'Sidharth'],
   openGraph: {
-    title: 'Laboratory OS',
-    description: 'Biometric access. Neural tools. Lab-grade portfolio.',
+    title: 'Dev Lab — Sidharth\'s Portfolio',
+    description: 'Interactive developer portfolio with live tools.',
     type: 'website',
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap"
           rel="stylesheet"
         />
       </head>
