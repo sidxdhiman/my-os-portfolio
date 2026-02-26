@@ -18,6 +18,7 @@ type TermLine = {
 };
 
 const MENU_MODULES = [
+    { label: 'Broski Board', id: 'notes-app' as AppId, desc: 'Notes, reminders, and tasks' },
     { label: 'Whiteboard', id: 'whiteboard' as AppId, desc: 'Collaborative digital canvas' },
     { label: 'Neural Eraser', id: 'neural-eraser' as AppId, desc: 'AI watermark removal' },
     { label: 'PDF Editor', id: 'pdf-editor' as AppId, desc: 'Full-featured PDF editing suite' },
@@ -45,16 +46,31 @@ function getNeofetch(user: LabUser | null): TermLine[] {
 }
 
 export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
-    const [lines, setLines] = useState<TermLine[]>([
-        ...makeLines([
-            'Dev Lab Shell v3.7.1',
-            `Signed in as ${user?.name ?? 'Guest'} · ${user?.accessLevel ?? 'No access'}`,
-            'Type "help" for available commands.',
-            '',
-        ], 'system'),
-    ]);
+    const [lines, setLines] = useState<TermLine[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('lab_term_lines');
+            if (saved) {
+                // re-assign ids so they don't overlap with newly generated lines in this session
+                return JSON.parse(saved).map((l: any) => ({ ...l, id: mkId() }));
+            }
+        }
+        return [
+            ...makeLines([
+                'Dev Lab Shell v3.7.1',
+                `Signed in as ${user?.name ?? 'Guest'} · ${user?.accessLevel ?? 'No access'}`,
+                'Type "help" for available commands.',
+                '',
+            ], 'system'),
+        ];
+    });
     const [input, setInput] = useState('');
-    const [history, setHistory] = useState<string[]>([]);
+    const [history, setHistory] = useState<string[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('lab_term_history');
+            if (saved) return JSON.parse(saved);
+        }
+        return [];
+    });
     const [histIdx, setHistIdx] = useState(-1);
     const [showMenu, setShowMenu] = useState(false);
     const [menuIdx, setMenuIdx] = useState(0);
@@ -71,7 +87,16 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lab_term_lines', JSON.stringify(lines));
+        }
     }, [lines]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('lab_term_history', JSON.stringify(history));
+        }
+    }, [history]);
 
     const addLines = useCallback((newLines: TermLine[]) => {
         setLines(prev => [...prev, ...newLines]);
@@ -109,7 +134,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
         } else if (trimmed === 'whoami') {
             addLines(makeLines(['', `  ${user?.name ?? 'guest'} · ${user?.accessLevel ?? 'none'}`, '']));
         } else if (trimmed === 'ls') {
-            addLines(makeLines(['', '  whiteboard/    Collaborative digital canvas', '  neural-eraser/ AI watermark removal engine', '  pdf-editor/    Full PDF editing suite', '']));
+            addLines(makeLines(['', '  notes-app/     Notes, reminders, and tasks', '  whiteboard/    Collaborative digital canvas', '  neural-eraser/ AI watermark removal engine', '  pdf-editor/    Full PDF editing suite', '']));
         } else if (trimmed === 'about') {
             addLines(makeLines(['', '  Dev Lab — interactive developer portfolio.', '  Built with Next.js + Framer Motion + TypeScript.', '  © 2026 Sidharth', '']));
         } else if (trimmed.startsWith('open ')) {

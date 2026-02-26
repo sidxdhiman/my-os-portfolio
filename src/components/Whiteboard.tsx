@@ -27,14 +27,24 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
 
-        // Light background
-        ctx.fillStyle = '#f8f9fc';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Try to load saved data
+        const saved = localStorage.getItem('lab_whiteboard_data');
+        if (saved) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = saved;
+        } else {
+            // Light background
+            ctx.fillStyle = '#f8f9fc';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Subtle dot grid
-        ctx.fillStyle = 'rgba(0,0,0,0.06)';
-        for (let x = 0; x < canvas.width; x += 28)
-            for (let y = 0; y < canvas.height; y += 28) { ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill(); }
+            // Subtle dot grid
+            ctx.fillStyle = 'rgba(0,0,0,0.06)';
+            for (let x = 0; x < canvas.width; x += 28)
+                for (let y = 0; y < canvas.height; y += 28) { ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill(); }
+        }
     }, []);
 
     function getPos(e: React.MouseEvent) {
@@ -57,7 +67,17 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
         lastPos.current = pos;
     }
-    function onMouseUp() { setDrawing(false); lastPos.current = null; }
+    function onMouseUp() {
+        setDrawing(false);
+        lastPos.current = null;
+
+        // Save to local storage automatically
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const dataUrl = canvas.toDataURL('image/png');
+            localStorage.setItem('lab_whiteboard_data', dataUrl);
+        }
+    }
 
     function clearCanvas() {
         const canvas = canvasRef.current; if (!canvas) return;
@@ -66,6 +86,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         ctx.fillStyle = 'rgba(0,0,0,0.06)';
         for (let x = 0; x < canvas.width; x += 28)
             for (let y = 0; y < canvas.height; y += 28) { ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill(); }
+        localStorage.removeItem('lab_whiteboard_data');
     }
 
     function exportCanvas() {

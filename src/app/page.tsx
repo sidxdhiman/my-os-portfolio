@@ -13,6 +13,7 @@ import { Terminal } from '@/components/Terminal';
 import { NeuralEraser } from '@/components/NeuralEraser';
 import { Whiteboard } from '@/components/Whiteboard';
 import { PdfEditor } from '@/components/PdfEditor';
+import { NotesApp } from '@/components/NotesApp';
 
 
 export default function LabOS() {
@@ -133,6 +134,16 @@ export default function LabOS() {
       </AnimatePresence>
 
       {/* ── Layer 4: App windows ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {os.openApps.includes('notes-app') && (
+          <NotesApp
+            key="notes-app"
+            userName={os.user?.name || 'Guest'}
+            onClose={() => os.closeApp('notes-app')}
+          />
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {os.openApps.includes('neural-eraser') && (
           <NeuralEraser
