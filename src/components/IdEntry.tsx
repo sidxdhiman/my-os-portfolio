@@ -13,12 +13,44 @@ const ROLES = ['Researcher', 'Developer', 'Architect', 'Root'];
 
 export function IdEntry({ setUser, setPhase }: IdEntryProps) {
     const [name, setName] = useState('');
+    const [password, setPassword] = useState('');
     const [role, setRole] = useState('Developer');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
     function handleSubmit() {
-        if (!name.trim()) { setError('Please enter your name to continue.'); return; }
+        if (!name.trim()) { setError('Please enter a username or identifier to continue.'); return; }
+        if (!password.trim()) { setError('Please enter a password.'); return; }
+
+        const safeName = name.trim().toLowerCase();
+
+        // Try getting the user db
+        let userRecords: Record<string, string> = {};
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem('lab_user_records');
+                if (stored) userRecords = JSON.parse(stored);
+            } catch (e) { }
+        }
+
+        // Extremely basic hash for local storage so passwords aren't literally plain text
+        const hashStr = (str: string) => str.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a }, 0).toString(16);
+        const inputHash = hashStr(password);
+
+        if (userRecords[safeName]) {
+            // User exists, verify password
+            if (userRecords[safeName] !== inputHash) {
+                setError('Incorrect password for this user.');
+                return;
+            }
+        } else {
+            // New user, create them
+            userRecords[safeName] = inputHash;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('lab_user_records', JSON.stringify(userRecords));
+            }
+        }
+
         setError('');
         setLoading(true);
         const userData: LabUser = {
@@ -83,7 +115,7 @@ export function IdEntry({ setUser, setPhase }: IdEntryProps) {
                     {/* Name field */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                            Your Name
+                            Username
                         </label>
                         <input
                             id="subject-name-input"
@@ -111,6 +143,40 @@ export function IdEntry({ setUser, setPhase }: IdEntryProps) {
                             }}
                             onBlur={e => {
                                 e.target.style.borderColor = error ? 'var(--error)' : 'var(--border-strong)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        />
+                    </div>
+
+                    {/* Password field */}
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                            Password
+                        </label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                            placeholder="Enter any password"
+                            style={{
+                                width: '100%',
+                                background: 'var(--bg)',
+                                border: `1.5px solid ${error && !password ? 'var(--error)' : 'var(--border-strong)'}`,
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '10px 14px',
+                                color: 'var(--text-primary)',
+                                fontFamily: 'var(--body)',
+                                fontSize: 15,
+                                outline: 'none',
+                                transition: 'border-color 0.2s, box-shadow 0.2s',
+                            }}
+                            onFocus={e => {
+                                e.target.style.borderColor = 'var(--brand)';
+                                e.target.style.boxShadow = '0 0 0 3px rgba(98,0,234,0.12)';
+                            }}
+                            onBlur={e => {
+                                e.target.style.borderColor = error && !password ? 'var(--error)' : 'var(--border-strong)';
                                 e.target.style.boxShadow = 'none';
                             }}
                         />

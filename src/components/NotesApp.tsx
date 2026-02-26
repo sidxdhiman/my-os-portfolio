@@ -42,52 +42,63 @@ const STATUSES: { value: Status; label: string; color: string }[] = [
 export function NotesApp({ onClose, userName }: NotesAppProps) {
     const [activeTab, setActiveTab] = useState<Tab>('notes');
 
-    // Notes state
-    const [notes, setNotes] = useState<Note[]>([]);
-    const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-    const [noteTitle, setNoteTitle] = useState('');
-    const [noteContent, setNoteContent] = useState('');
-
-    // Kanban state
-    const [boards, setBoards] = useState<KanbanBoard[]>([{ id: 'default', name: 'Main Project', tasks: [] }]);
-    const [activeBoardId, setActiveBoardId] = useState<string>('default');
-    const [newTodo, setNewTodo] = useState('');
-    const [newBoardName, setNewBoardName] = useState('');
-    const [isCreatingBoard, setIsCreatingBoard] = useState(false);
-
     const NOTES_KEY = `lab_notes_${userName}`;
     const TODOS_KEY = `lab_todos_${userName}`;
 
-    // Load data from localStorage
-    useEffect(() => {
-        const savedNotes = localStorage.getItem(NOTES_KEY);
-        const savedTodos = localStorage.getItem(TODOS_KEY);
-        if (savedNotes) {
-            const parsed = JSON.parse(savedNotes);
-            setNotes(parsed);
-            if (parsed.length > 0) {
-                setActiveNoteId(parsed[0].id);
-                setNoteTitle(parsed[0].title);
-                setNoteContent(parsed[0].content);
+    // Notes state
+    const [notes, setNotes] = useState<Note[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(NOTES_KEY);
+            if (saved) {
+                try { return JSON.parse(saved); } catch { }
             }
         }
-        if (savedTodos) {
-            const parsed = JSON.parse(savedTodos);
-            if (parsed.boards && Array.isArray(parsed.boards)) {
-                // New format
-                setBoards(parsed.boards);
-                setActiveBoardId(parsed.activeBoardId || parsed.boards[0]?.id || 'default');
-            } else if (Array.isArray(parsed)) {
-                // Migrate extremely old single-board format to multi-board format
-                const migratedTasks = parsed.map((t: any) => ({
-                    ...t,
-                    status: t.status === 'todo' ? 'backlog' : (t.status ? t.status : (t.done ? 'done' : 'backlog'))
-                }));
-                setBoards([{ id: 'default', name: 'Main Project', tasks: migratedTasks }]);
-                setActiveBoardId('default');
+        return [];
+    });
+
+    // We derive active note state down below but need to store the IDs
+    const [activeNoteId, setActiveNoteId] = useState<string | null>(notes.length > 0 ? notes[0].id : null);
+    const [noteTitle, setNoteTitle] = useState(notes.length > 0 ? notes[0].title : '');
+    const [noteContent, setNoteContent] = useState(notes.length > 0 ? notes[0].content : '');
+
+    // Kanban state
+    const [boards, setBoards] = useState<KanbanBoard[]>(() => {
+        if (typeof window !== 'undefined') {
+            const savedTodos = localStorage.getItem(TODOS_KEY);
+            if (savedTodos) {
+                try {
+                    const parsed = JSON.parse(savedTodos);
+                    if (parsed.boards && Array.isArray(parsed.boards)) return parsed.boards;
+                    if (Array.isArray(parsed)) {
+                        return [{
+                            id: 'default', name: 'Main Project', tasks: parsed.map((t: any) => ({
+                                ...t, status: t.status === 'todo' ? 'backlog' : (t.status || (t.done ? 'done' : 'backlog'))
+                            }))
+                        }];
+                    }
+                } catch { }
             }
         }
-    }, [NOTES_KEY, TODOS_KEY]);
+        return [{ id: 'default', name: 'Main Project', tasks: [] }];
+    });
+
+    const [activeBoardId, setActiveBoardId] = useState<string>(() => {
+        if (typeof window !== 'undefined') {
+            const savedTodos = localStorage.getItem(TODOS_KEY);
+            if (savedTodos) {
+                try {
+                    const parsed = JSON.parse(savedTodos);
+                    if (parsed.activeBoardId) return parsed.activeBoardId;
+                    if (parsed.boards && parsed.boards.length > 0) return parsed.boards[0].id;
+                } catch { }
+            }
+        }
+        return 'default';
+    });
+
+    const [newTodo, setNewTodo] = useState('');
+    const [newBoardName, setNewBoardName] = useState('');
+    const [isCreatingBoard, setIsCreatingBoard] = useState(false);
 
     // Save data whenever it changes
     useEffect(() => {
