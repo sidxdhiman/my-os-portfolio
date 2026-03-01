@@ -1,8 +1,10 @@
-'use client';
+const fs = require('fs');
+
+const code = `'use client';
 
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ArrowLeft, Download, Trash2 } from 'lucide-react';
+import { Plus, ArrowLeft, Settings, Palette, Download, Trash2 } from 'lucide-react';
 
 interface WhiteboardProps { onClose: () => void; }
 type Tool = 'pen' | 'eraser';
@@ -22,19 +24,16 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [tool, setTool] = useState<Tool>('pen');
     const [color, setColor] = useState('#1a1d2e');
-    const [penSize, setPenSize] = useState(3);
-    const [eraserSize, setEraserSize] = useState(24);
+    const [size, setSize] = useState(3);
     const [drawing, setDrawing] = useState(false);
     const lastPos = useRef<{ x: number; y: number } | null>(null);
-
-    const size = tool === 'pen' ? penSize : eraserSize;
 
     // Launchpad states
     const [boards, setBoards] = useState<BoardMeta[]>(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('lab_whiteboard_boards');
             if (saved) {
-                try { return JSON.parse(saved); } catch { }
+                try { return JSON.parse(saved); } catch {}
             }
             const oldData = localStorage.getItem('lab_whiteboard_data');
             if (oldData) {
@@ -46,12 +45,12 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         }
         return [];
     });
-
+    
     const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
     const [isCreateBoardModalOpen, setIsCreateBoardModalOpen] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
     const [showHelpModal, setShowHelpModal] = useState(true);
-    const [colorMenuPos, setColorMenuPos] = useState<{ x: number, y: number } | null>(null);
+    const [colorMenuPos, setColorMenuPos] = useState<{x: number, y: number} | null>(null);
 
     const lastShiftTime = useRef<number>(0);
 
@@ -80,11 +79,11 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-
+        
         canvas.width = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
 
-        const saved = localStorage.getItem(`lab_whiteboard_data_${activeBoardId}`);
+        const saved = localStorage.getItem(\`lab_whiteboard_data_\${activeBoardId}\`);
         if (saved) {
             const img = new Image();
             img.onload = () => {
@@ -101,7 +100,6 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
             const t = setTimeout(initCanvas, 50);
             return () => clearTimeout(t);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeBoardId]);
 
     function clearCanvasInternal(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
@@ -116,13 +114,13 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         const r = canvasRef.current!.getBoundingClientRect();
         return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
-
-    function onMouseDown(e: React.MouseEvent) {
+    
+    function onMouseDown(e: React.MouseEvent) { 
         if (colorMenuPos) setColorMenuPos(null);
-        setDrawing(true);
-        lastPos.current = getPos(e);
+        setDrawing(true); 
+        lastPos.current = getPos(e); 
     }
-
+    
     function onMouseMove(e: React.MouseEvent) {
         if (!drawing) return;
         const canvas = canvasRef.current; if (!canvas) return;
@@ -138,15 +136,15 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
         lastPos.current = pos;
     }
-
+    
     function updatePreview() {
         const canvas = canvasRef.current;
         if (!canvas || !activeBoardId) return;
         // save high quality
         const hqData = canvas.toDataURL('image/png');
-        localStorage.setItem(`lab_whiteboard_data_${activeBoardId}`, hqData);
-
-        // save preview
+        localStorage.setItem(\`lab_whiteboard_data_\${activeBoardId}\`, hqData);
+        
+        // save preview downscaled a bit for memory if we want, but letting dataURL suffice
         setBoards(prev => prev.map(b => b.id === activeBoardId ? { ...b, preview: hqData } : b));
     }
 
@@ -161,21 +159,12 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         if (e.shiftKey) {
             if (tool === 'pen') {
                 setColorMenuPos({ x: e.clientX, y: e.clientY });
-                if (e.deltaY > 0) {
-                    const idx = COLORS.indexOf(color);
-                    setColor(COLORS[idx === -1 ? 0 : (idx + 1) % COLORS.length]);
-                } else {
-                    const idx = COLORS.indexOf(color);
-                    setColor(COLORS[idx === -1 ? COLORS.length - 1 : (idx - 1 + COLORS.length) % COLORS.length]);
-                }
             }
         } else {
             if (e.deltaY > 0) {
-                if (tool === 'pen') setPenSize(s => Math.max(1, s - 1));
-                else setEraserSize(s => Math.max(1, s - 1));
+                setSize(s => Math.max(1, s - 1));
             } else {
-                if (tool === 'pen') setPenSize(s => Math.min(48, s + 1));
-                else setEraserSize(s => Math.min(48, s + 1));
+                setSize(s => Math.min(24, s + 1));
             }
         }
     }
@@ -195,14 +184,14 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         canvas.toBlob(blob => {
             if (!blob) return;
             const url = URL.createObjectURL(blob);
-            const a = Object.assign(document.createElement('a'), { href: url, download: `${name}.png` });
+            const a = Object.assign(document.createElement('a'), { href: url, download: \`\${name}.png\` });
             a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
         }, 'image/png');
     }
 
     function handleCreateBoard() {
         if (!newBoardName.trim()) return;
-
+        // eslint-disable-next-line react-hooks/purity
         const id = crypto.randomUUID();
         const newBoard: BoardMeta = {
             id,
@@ -213,21 +202,21 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         setActiveBoardId(id);
         setNewBoardName('');
         setIsCreateBoardModalOpen(false);
-        setShowHelpModal(true); // show help when entering a canvas
+        setShowHelpModal(true); // show help when entering a new board too
     }
 
     function handleDeleteBoard(e: React.MouseEvent, id: string) {
         e.stopPropagation();
         if (confirm('Delete this canvas?')) {
             setBoards(prev => prev.filter(b => b.id !== id));
-            localStorage.removeItem(`lab_whiteboard_data_${id}`);
+            localStorage.removeItem(\`lab_whiteboard_data_\${id}\`);
         }
     }
 
     const toolBtn = (active: boolean) => ({
         padding: '6px 14px',
         background: active ? 'var(--brand-xlight)' : 'transparent',
-        border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+        border: \`1px solid \${active ? 'var(--brand)' : 'var(--border)'}\`,
         borderRadius: 8,
         color: active ? 'var(--brand)' : 'var(--text-secondary)',
         fontFamily: 'var(--body)', fontSize: 13,
@@ -298,7 +287,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                     onClick={() => setActiveBoardId(b.id)}
                                     style={{
                                         height: 180, borderRadius: 16, cursor: 'pointer', position: 'relative', overflow: 'hidden',
-                                        background: b.preview ? `url(${b.preview}) center/contain no-repeat` : '#f8f9fc',
+                                        background: b.preview ? \`url(\${b.preview}) center/contain no-repeat\` : '#f8f9fc',
                                         backgroundColor: '#fff',
                                         border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
                                     }}
@@ -315,7 +304,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                 </div>
                             ))}
                         </div>
-
+                        
                         <AnimatePresence>
                             {isCreateBoardModalOpen && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -343,7 +332,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                 <ArrowLeft size={14} /> Back
                             </button>
                             <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 4px' }} />
-
+                            
                             <button style={toolBtn(tool === 'pen')} onClick={() => setTool('pen')}>
                                 <span>✏</span> Pen
                             </button>
@@ -358,7 +347,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                     <button
                                         key={c}
                                         onClick={() => { setColor(c); setTool('pen'); }}
-                                        style={{ width: 20, height: 20, borderRadius: 5, background: c, cursor: 'pointer', border: color === c ? '2.5px solid var(--brand)' : `2px solid ${c === '#ffffff' ? 'var(--border)' : 'transparent'}`, transform: color === c ? 'scale(1.2)' : 'scale(1)', transition: 'all 0.12s' }}
+                                        style={{ width: 20, height: 20, borderRadius: 5, background: c, cursor: 'pointer', border: color === c ? '2.5px solid var(--brand)' : \`2px solid \${c === '#ffffff' ? 'var(--border)' : 'transparent'}\`, transform: color === c ? 'scale(1.2)' : 'scale(1)', transition: 'all 0.12s' }}
                                     />
                                 ))}
                                 <input type="color" value={color} onChange={e => { setColor(e.target.value); setTool('pen'); }} title="Custom color" style={{ width: 24, height: 24, borderRadius: 5, border: '1px solid var(--border)', cursor: 'pointer', padding: 0 }} />
@@ -368,15 +357,12 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Size</span>
-                                <input type="range" min={1} max={48} value={size} onChange={e => {
-                                    if (tool === 'pen') setPenSize(+e.target.value);
-                                    else setEraserSize(+e.target.value);
-                                }} style={{ width: 80, accentColor: 'var(--brand)', cursor: 'pointer' }} />
+                                <input type="range" min={1} max={24} value={size} onChange={e => setSize(+e.target.value)} style={{ width: 80, accentColor: 'var(--brand)', cursor: 'pointer' }} />
                                 <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text-secondary)', minWidth: 20 }}>{size}</span>
                             </div>
 
                             <div style={{ flex: 1 }} />
-
+                            
                             <button onClick={() => setShowHelpModal(true)} style={{ padding: '6px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--brand)', cursor: 'pointer', fontWeight: 600 }}>Help</button>
 
                             <button onClick={exportCanvas} style={{ padding: '6px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
@@ -386,7 +372,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                 ✕ Clear
                             </button>
                         </div>
-
+                        
                         <div style={{ flex: 1, position: 'relative' }}>
                             <canvas
                                 ref={canvasRef}
@@ -406,11 +392,9 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                 {colorMenuPos && (
                                     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
                                         style={{
-                                            position: 'fixed',
-                                            left: Math.min(colorMenuPos.x, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 150),
-                                            top: Math.min(colorMenuPos.y, (typeof window !== 'undefined' ? window.innerHeight : 1000) - 150),
+                                            position: 'absolute', left: Math.min(colorMenuPos.x, (canvasRef.current?.offsetWidth || 1000) - 130), top: Math.min(colorMenuPos.y, (canvasRef.current?.offsetHeight || 1000) - 100), 
                                             background: 'var(--bg-card)', padding: 12, borderRadius: 12, boxShadow: 'var(--shadow-xl)',
-                                            border: '1px solid var(--border)', zIndex: 300, width: 130
+                                            border: '1px solid var(--border)', zIndex: 100, width: 130
                                         }}
                                         onMouseLeave={() => setColorMenuPos(null)}
                                     >
@@ -420,16 +404,15 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                                 <button
                                                     key={c}
                                                     onClick={() => { setColor(c); setColorMenuPos(null); }}
-                                                    style={{ width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer', border: color === c ? '2px solid var(--brand)' : `1px solid ${c === '#ffffff' ? 'calc(var(--border)*0.5)' : 'transparent'}`, transform: color === c ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.1s' }}
+                                                    style={{ width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer', border: color === c ? '2px solid var(--brand)' : \`1px solid \${c==='#ffffff'?'var(--border)':'transparent'}\`, transform: color === c ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.1s' }}
                                                 />
                                             ))}
-                                            <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: '100%', height: 28, marginTop: 4, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', padding: 0 }} />
                                         </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
                         </div>
-
+                        
                         <AnimatePresence>
                             {showHelpModal && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -458,7 +441,7 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
                                                 </div>
                                             </div>
                                         </div>
-                                        <button onClick={() => setShowHelpModal(false)} style={{ width: '100%', padding: '14px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', fontWeight: 600, fontSize: 15, marginTop: 24, boxShadow: '0 4px 12px rgba(57, 224, 121, 0.25)' }}>Got it, let&apos;s draw!</button>
+                                        <button onClick={() => setShowHelpModal(false)} style={{ width: '100%', padding: '14px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', fontWeight: 600, fontSize: 15, marginTop: 24, boxShadow: '0 4px 12px rgba(57, 224, 121, 0.25)' }}>Got it, let's draw!</button>
                                     </motion.div>
                                 </motion.div>
                             )}
@@ -469,4 +452,6 @@ export function Whiteboard({ onClose }: WhiteboardProps) {
         </motion.div>
     );
 }
+'
 
+fs.writeFileSync('src/components/Whiteboard.tsx', code);

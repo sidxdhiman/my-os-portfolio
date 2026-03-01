@@ -7,7 +7,7 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import htmlToPdfmake from 'html-to-pdfmake';
 import { asBlob } from 'html-docx-js-typescript';
-import { Cloud, Link as LinkIcon, Download, FileText, Mail } from 'lucide-react';
+import { Cloud, Link as LinkIcon, Download, FileText, Mail, ArrowLeft, Settings, Image as ImageIcon, Palette, Check, Plus } from 'lucide-react';
 import 'suneditor/dist/css/suneditor.min.css';
 
 (pdfMake as any).vfs = pdfFonts;
@@ -20,7 +20,7 @@ interface NotesAppProps {
 }
 
 type Tab = 'notes' | 'kanban';
-type Status = 'backlog' | 'in-progress' | 'on-hold' | 'review' | 'ready' | 'done';
+type Status = string;
 
 interface Note {
     id: string;
@@ -35,19 +35,34 @@ interface Todo {
     status: Status;
 }
 
+interface Column {
+    id: string;
+    label: string;
+    color: string;
+}
+
 interface KanbanBoard {
     id: string;
     name: string;
     tasks: Todo[];
+    bgImage?: string;
+    columns?: Column[];
 }
 
-const STATUSES: { value: Status; label: string; color: string }[] = [
-    { value: 'backlog', label: 'Backlog', color: '#94a3b8' },
-    { value: 'in-progress', label: 'In Progress', color: '#3b82f6' },
-    { value: 'on-hold', label: 'On Hold', color: '#f59e0b' },
-    { value: 'review', label: 'Review', color: '#8b5cf6' },
-    { value: 'ready', label: 'Ready', color: '#14b8a6' },
-    { value: 'done', label: 'Done', color: '#10b981' }
+const DEFAULT_STATUSES: Column[] = [
+    { id: 'backlog', label: 'Backlog', color: '#94a3b8' },
+    { id: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+    { id: 'on-hold', label: 'On Hold', color: '#f59e0b' },
+    { id: 'review', label: 'Review', color: '#8b5cf6' },
+    { id: 'ready', label: 'Ready', color: '#14b8a6' },
+    { id: 'done', label: 'Done', color: '#10b981' }
+];
+
+const PREBUILT_BGS = [
+    'https://images.unsplash.com/photo-1542281286-9e0a16bb7366?auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1506744626753-dba37c1fb41a?auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80'
 ];
 
 export function NotesApp({ onClose, userName }: NotesAppProps) {
@@ -93,23 +108,32 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
         return [{ id: 'default', name: 'Main Project', tasks: [] }];
     });
 
-    const [activeBoardId, setActiveBoardId] = useState<string>(() => {
+    const [activeBoardId, setActiveBoardId] = useState<string | null>(() => {
         if (typeof window !== 'undefined') {
             const savedTodos = localStorage.getItem(TODOS_KEY);
             if (savedTodos) {
                 try {
                     const parsed = JSON.parse(savedTodos);
-                    if (parsed.activeBoardId) return parsed.activeBoardId;
-                    if (parsed.boards && parsed.boards.length > 0) return parsed.boards[0].id;
+                    if (parsed.activeBoardId !== undefined) return parsed.activeBoardId;
                 } catch { }
             }
         }
-        return 'default';
+        return null;
     });
 
     const [newTodo, setNewTodo] = useState('');
+    const [isCreateBoardModalOpen, setIsCreateBoardModalOpen] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
-    const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+    const [newBoardBg, setNewBoardBg] = useState(PREBUILT_BGS[0]);
+    const [newBoardColsType, setNewBoardColsType] = useState<'default' | 'custom'>('default');
+    const [newBoardCustomCols, setNewBoardCustomCols] = useState('To Do, Doing, Done');
+
+    const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false);
+    const [editBoardName, setEditBoardName] = useState('');
+    const [editBoardBg, setEditBoardBg] = useState('');
+    const [editBoardColsType, setEditBoardColsType] = useState<'default' | 'custom'>('default');
+    const [editBoardCustomCols, setEditBoardCustomCols] = useState('');
+    const [deleteBoardConfirm, setDeleteBoardConfirm] = useState('');
 
     // Share Modal state
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -139,10 +163,13 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
             return;
         }
 
+
         const newNote: Note = {
-            id: Date.now().toString(),
+
+            id: crypto.randomUUID(),
             title: '', // explicitly start empty
             content: '',
+
             date: new Date().toLocaleDateString()
         };
         setNotes([newNote, ...notes]);
@@ -266,25 +293,88 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
     };
 
     // Kanban actions
-    const activeBoardIndex = boards.findIndex(b => b.id === activeBoardId);
-    const activeBoard = boards[activeBoardIndex] || boards[0];
+    const activeBoardIndex = activeBoardId ? boards.findIndex(b => b.id === activeBoardId) : -1;
+    const activeBoard = activeBoardIndex >= 0 ? boards[activeBoardIndex] : null;
+    const activeColumns = activeBoard?.columns || DEFAULT_STATUSES;
 
-    function createBoard(e: React.KeyboardEvent) {
-        if (e.key === 'Enter' && newBoardName.trim()) {
-            const newBoard: KanbanBoard = { id: Date.now().toString(), name: newBoardName.trim(), tasks: [] };
-            setBoards([...boards, newBoard]);
-            setActiveBoardId(newBoard.id);
-            setNewBoardName('');
-            setIsCreatingBoard(false);
-        } else if (e.key === 'Escape') {
-            setIsCreatingBoard(false);
-            setNewBoardName('');
+    function handleCreateBoard() {
+        if (!newBoardName.trim()) return;
+        let cols: Column[] | undefined = undefined;
+        if (newBoardColsType === 'custom') {
+            const labels = newBoardCustomCols.split(',').map(s => s.trim()).filter(Boolean);
+            if (labels.length > 0) {
+                const colors = ['#94a3b8', '#3b82f6', '#f59e0b', '#8b5cf6', '#14b8a6', '#10b981', '#ef4444', '#ec4899'];
+                cols = labels.map((label, i) => ({
+                    id: label.toLowerCase().replace(/\s+/g, '-'),
+                    label,
+                    color: colors[i % colors.length]
+                }));
+            }
         }
+
+        const newBoard: KanbanBoard = {
+
+            id: crypto.randomUUID(),
+            name: newBoardName.trim(),
+            tasks: [],
+            bgImage: newBoardBg,
+            columns: cols
+        };
+        setBoards([...boards, newBoard]);
+        setActiveBoardId(newBoard.id);
+        setNewBoardName('');
+        setIsCreateBoardModalOpen(false);
     }
 
-    function addTodo(e: React.KeyboardEvent) {
+    function openEditBoardModal() {
+        if (!activeBoard) return;
+        setEditBoardName(activeBoard.name);
+        setEditBoardBg(activeBoard.bgImage || '');
+        if (activeBoard.columns === undefined || activeBoard.columns.length === 0 || activeBoard.columns.every((c, i) => DEFAULT_STATUSES[i] && c.id === DEFAULT_STATUSES[i].id)) {
+            setEditBoardColsType('default');
+            setEditBoardCustomCols('To Do, Doing, Done');
+        } else {
+            setEditBoardColsType('custom');
+            setEditBoardCustomCols(activeBoard.columns.map(c => c.label).join(', '));
+        }
+        setDeleteBoardConfirm('');
+        setIsEditBoardModalOpen(true);
+    }
+
+    function handleEditBoard() {
+        if (!editBoardName.trim() || !activeBoardId) return;
+        let cols: Column[] | undefined = undefined;
+        if (editBoardColsType === 'custom') {
+            const labels = editBoardCustomCols.split(',').map(s => s.trim()).filter(Boolean);
+            if (labels.length > 0) {
+                const colors = ['#94a3b8', '#3b82f6', '#f59e0b', '#8b5cf6', '#14b8a6', '#10b981', '#ef4444', '#ec4899'];
+                cols = labels.map((label, i) => ({
+                    id: label.toLowerCase().replace(/\s+/g, '-'),
+                    label,
+                    color: colors[i % colors.length]
+                }));
+            }
+        }
+        setBoards(prev => prev.map(b => b.id === activeBoardId ? {
+            ...b,
+            name: editBoardName.trim(),
+            bgImage: editBoardBg,
+            columns: cols
+        } : b));
+        setIsEditBoardModalOpen(false);
+    }
+
+    function handleDeleteBoard() {
+        if (!activeBoardId || deleteBoardConfirm !== activeBoard?.name) return;
+        setBoards(prev => prev.filter(b => b.id !== activeBoardId));
+        setActiveBoardId(null);
+        setIsEditBoardModalOpen(false);
+    }
+
+    function addTodo(e: React.KeyboardEvent, statusId: string) {
         if (e.key === 'Enter' && newTodo.trim() && activeBoard) {
-            const newTask: Todo = { id: Date.now().toString(), text: newTodo.trim(), status: 'backlog' };
+
+            const newTask: Todo = { id: crypto.randomUUID(), text: newTodo.trim(), status: statusId };
             setBoards(prev => {
                 const updated = [...prev];
                 updated[activeBoardIndex] = { ...activeBoard, tasks: [newTask, ...activeBoard.tasks] };
@@ -295,9 +385,10 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
     }
 
     function deleteTodo(id: string) {
+        if (activeBoardIndex < 0) return;
         setBoards(prev => {
             const updated = [...prev];
-            updated[activeBoardIndex] = { ...activeBoard, tasks: activeBoard.tasks.filter(t => t.id !== id) };
+            updated[activeBoardIndex] = { ...activeBoard!, tasks: activeBoard!.tasks.filter(t => t.id !== id) };
             return updated;
         });
     }
@@ -305,7 +396,6 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
     // Drag and Drop implementation
     function handleDragStart(e: React.DragEvent, id: string) {
         e.dataTransfer.setData('text/plain', id);
-        // Optional: Add some visual feedback to the element being dragged
         if (e.currentTarget instanceof HTMLElement) {
             e.currentTarget.style.opacity = '0.5';
         }
@@ -317,14 +407,15 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
         }
     }
 
-    function handleDrop(e: React.DragEvent, status: Status) {
+    function handleDrop(e: React.DragEvent, statusId: string) {
         e.preventDefault();
         const id = e.dataTransfer.getData('text/plain');
+        if (activeBoardIndex < 0) return;
         setBoards(prev => {
             const updated = [...prev];
             updated[activeBoardIndex] = {
-                ...activeBoard,
-                tasks: activeBoard.tasks.map(t => t.id === id ? { ...t, status } : t)
+                ...activeBoard!,
+                tasks: activeBoard!.tasks.map(t => t.id === id ? { ...t, status: statusId } : t)
             };
             return updated;
         });
@@ -615,126 +706,212 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
 
                 {activeTab === 'kanban' && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)', overflow: 'hidden' }}>
-                        {/* Boards Bar */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', flexShrink: 0 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>PROJECTS</span>
-                            {boards.map(b => (
-                                <button
-                                    key={b.id}
-                                    onClick={() => setActiveBoardId(b.id)}
-                                    style={{
-                                        padding: '6px 14px', borderRadius: 100, border: '1px solid var(--border)',
-                                        background: activeBoardId === b.id ? 'var(--bg-card)' : 'transparent',
-                                        color: activeBoardId === b.id ? 'var(--text-primary)' : 'var(--text-muted)',
-                                        fontWeight: activeBoardId === b.id ? 600 : 500, fontSize: 13,
-                                        cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
-                                        boxShadow: activeBoardId === b.id ? 'var(--shadow-sm)' : 'none',
-                                    }}
-                                >
-                                    {b.name}
-                                </button>
-                            ))}
-
-                            {isCreatingBoard ? (
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    placeholder="Board Name (Enter)"
-                                    value={newBoardName}
-                                    onChange={e => setNewBoardName(e.target.value)}
-                                    onKeyDown={createBoard}
-                                    onBlur={() => { setIsCreatingBoard(false); setNewBoardName(''); }}
-                                    style={{
-                                        padding: '6px 14px', borderRadius: 100, border: '1px dashed var(--brand)',
-                                        background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: 13, width: 140
-                                    }}
-                                />
-                            ) : (
-                                <button
-                                    onClick={() => setIsCreatingBoard(true)}
-                                    style={{
-                                        padding: '6px 14px', borderRadius: 100, border: '1px dashed var(--border-strong)',
-                                        background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
-                                        transition: 'all 0.15s'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-                                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-                                >
-                                    + New Board
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Kanban Columns */}
-                        <div style={{ flex: 1, display: 'flex', padding: 24, gap: 24, overflowX: 'auto', alignItems: 'flex-start' }}>
-                            {STATUSES.map(stat => (
-                                <div
-                                    key={stat.value}
-                                    onDrop={e => handleDrop(e, stat.value)}
-                                    onDragOver={handleDragOver}
-                                    style={{
-                                        flex: '0 0 300px', background: 'var(--bg-card)', borderRadius: 12,
-                                        border: '1px solid var(--border)', display: 'flex', flexDirection: 'column',
-                                        maxHeight: '100%', boxShadow: 'var(--shadow-sm)',
-                                    }}
-                                >
-                                    <div style={{
-                                        padding: '16px', borderBottom: '1px solid var(--border)', fontWeight: 600,
-                                        display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-primary)', flexShrink: 0
-                                    }}>
-                                        <div style={{
-                                            width: 10, height: 10, borderRadius: '50%',
-                                            background: stat.color
-                                        }} />
-                                        {stat.label}
-                                        <span style={{ marginLeft: 'auto', background: 'var(--bg-subtle)', padding: '2px 8px', borderRadius: 100, fontSize: 11 }}>
-                                            {activeBoard?.tasks.filter(t => t.status === stat.value).length || 0}
-                                        </span>
+                        {!activeBoardId ? (
+                            // LAUNCHPAD UI
+                            <div style={{ flex: 1, padding: 40, overflowY: 'auto' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+                                    <div>
+                                        <h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px', color: 'var(--text-primary)' }}>Launchpad</h2>
+                                        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Select a board to get started or create a new one.</p>
                                     </div>
-                                    <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
-                                        {stat.value === 'backlog' && (
-                                            <input
-                                                type="text"
-                                                placeholder="+ Add new card..."
-                                                value={newTodo}
-                                                onChange={e => setNewTodo(e.target.value)}
-                                                onKeyDown={addTodo}
-                                                style={{
-                                                    padding: '12px', borderRadius: 8, border: '1px dashed var(--border-strong)',
-                                                    background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: 13,
-                                                    transition: 'all 0.15s', flexShrink: 0
-                                                }}
-                                                onFocus={e => { e.target.style.borderColor = 'var(--brand)'; e.target.style.background = 'var(--bg-subtle)'; }}
-                                                onBlur={e => { e.target.style.borderColor = 'var(--border-strong)'; e.target.style.background = 'transparent'; }}
-                                            />
-                                        )}
-                                        {activeBoard?.tasks.filter(t => t.status === stat.value).map(todo => (
-                                            <div
-                                                key={todo.id}
-                                                draggable
-                                                onDragStart={e => handleDragStart(e, todo.id)}
-                                                onDragEnd={handleDragEnd}
-                                                style={{
-                                                    padding: '14px', background: 'var(--bg)', borderRadius: 8,
-                                                    border: '1px solid var(--border)', cursor: 'grab',
-                                                    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-                                                    boxShadow: 'var(--shadow-sm)', transition: 'transform 0.15s', flexShrink: 0
-                                                }}
-                                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-                                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
-                                            >
-                                                <span style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4, wordBreak: 'break-word', paddingRight: 8 }}>{todo.text}</span>
-                                                <button
-                                                    onClick={() => deleteTodo(todo.id)}
-                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, marginTop: 2, padding: 4 }}
-                                                    title="Delete task"
-                                                >✕</button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <button
+                                        onClick={() => setIsCreateBoardModalOpen(true)}
+                                        style={{ padding: '8px 16px', background: 'var(--brand)', color: '#fff', borderRadius: 8, border: 'none', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s', boxShadow: '0 4px 12px rgba(57, 224, 121, 0.25)' }}
+                                    >
+                                        <Plus size={16} /> New Board
+                                    </button>
                                 </div>
-                            ))}
-                        </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+                                    {boards.map(b => (
+                                        <div
+                                            key={b.id}
+                                            onClick={() => setActiveBoardId(b.id)}
+                                            style={{
+                                                height: 160, borderRadius: 16, cursor: 'pointer', position: 'relative', overflow: 'hidden',
+                                                background: b.bgImage ? `url(${b.bgImage}) center/cover no-repeat` : 'var(--bg-card)',
+                                                border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; }}
+                                        >
+                                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.1))' }} />
+                                            <div style={{ position: 'absolute', bottom: 20, left: 20, right: 20 }}>
+                                                <h3 style={{ margin: 0, color: '#fff', fontSize: 18, fontWeight: 600, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{b.name}</h3>
+                                                <div style={{ display: 'inline-block', fontSize: 12, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(4px)', padding: '4px 10px', borderRadius: 100, marginTop: 8 }}>
+                                                    {b.tasks.length} Task{b.tasks.length !== 1 && 's'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <AnimatePresence>
+                                    {isCreateBoardModalOpen && (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} style={{ background: 'var(--bg-card)', padding: '32px 40px', borderRadius: 24, width: '100%', maxWidth: 540, border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
+                                                <h2 style={{ margin: '0 0 24px', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>Create New Board</h2>
+
+                                                <label style={{ display: 'block', marginBottom: 20 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Board Name</div>
+                                                    <input type="text" value={newBoardName} onChange={e => setNewBoardName(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="e.g. Project Alpha" onFocus={e => e.target.style.borderColor = 'var(--brand)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                </label>
+
+                                                <label style={{ display: 'block', marginBottom: 20 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}><ImageIcon size={14} /> Background Details</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
+                                                        {PREBUILT_BGS.map(bg => (
+                                                            <div key={bg} onClick={() => setNewBoardBg(bg)} style={{ height: 64, borderRadius: 8, background: `url(${bg}) center/cover`, cursor: 'pointer', border: newBoardBg === bg ? '2px solid var(--brand)' : '2px solid transparent', boxShadow: newBoardBg === bg ? '0 0 0 2px var(--bg-card) inset' : 'none', opacity: newBoardBg === bg ? 1 : 0.6, transition: 'all 0.15s' }} onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => { if (newBoardBg !== bg) e.currentTarget.style.opacity = '0.6'; }} />
+                                                        ))}
+                                                    </div>
+                                                    <input type="text" value={newBoardBg} onChange={e => setNewBoardBg(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="Or paste an image web URL..." onFocus={e => e.target.style.borderColor = 'var(--brand)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                </label>
+
+                                                <label style={{ display: 'block', marginBottom: 32 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}><Palette size={14} /> Workflow Columns</div>
+                                                    <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}><input type="radio" checked={newBoardColsType === 'default'} onChange={() => setNewBoardColsType('default')} style={{ accentColor: 'var(--brand)' }} /> Default (Agile)</label>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}><input type="radio" checked={newBoardColsType === 'custom'} onChange={() => setNewBoardColsType('custom')} style={{ accentColor: 'var(--brand)' }} /> Custom Steps</label>
+                                                    </div>
+                                                    {newBoardColsType === 'custom' && (
+                                                        <input type="text" value={newBoardCustomCols} onChange={e => setNewBoardCustomCols(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="Comma separated strings: To Do, Doing, Done" onFocus={e => e.target.style.borderColor = 'var(--brand)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                    )}
+                                                </label>
+
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                                    <button onClick={() => setIsCreateBoardModalOpen(false)} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)' }}>Cancel</button>
+                                                    <button onClick={handleCreateBoard} disabled={!newBoardName.trim()} style={{ padding: '10px 24px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600, opacity: newBoardName.trim() ? 1 : 0.5, boxShadow: '0 4px 12px rgba(57, 224, 121, 0.25)' }}>Finish Creation</button>
+                                                </div>
+                                            </motion.div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        ) : (
+                            // ACTIVE BOARD UI
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: activeBoard?.bgImage ? `url(${activeBoard?.bgImage}) center/cover fixed` : 'var(--bg)', position: 'relative' }}>
+                                {/* Top Bar overlay */}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', background: activeBoard?.bgImage ? 'rgba(0,0,0,0.6)' : 'var(--bg)', backdropFilter: activeBoard?.bgImage ? 'blur(12px)' : 'none', borderBottom: activeBoard?.bgImage ? '1px solid rgba(255,255,255,0.1)' : '1px solid var(--border)', zIndex: 10 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                                        <button onClick={() => setActiveBoardId(null)} style={{ background: activeBoard?.bgImage ? 'rgba(255,255,255,0.15)' : 'var(--bg-subtle)', color: activeBoard?.bgImage ? '#fff' : 'var(--text-primary)', border: 'none', padding: '8px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, transition: 'all 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = activeBoard?.bgImage ? 'rgba(255,255,255,0.25)' : 'var(--border)'} onMouseLeave={e => e.currentTarget.style.background = activeBoard?.bgImage ? 'rgba(255,255,255,0.15)' : 'var(--bg-subtle)'}>
+                                            <ArrowLeft size={16} /> Back
+                                        </button>
+                                        <h2 style={{ margin: 0, color: activeBoard?.bgImage ? '#fff' : 'var(--text-primary)', fontSize: 18, fontWeight: 700 }}>{activeBoard?.name}</h2>
+                                    </div>
+                                    <button onClick={openEditBoardModal} style={{ background: 'transparent', color: activeBoard?.bgImage ? '#fff' : 'var(--text-primary)', border: activeBoard?.bgImage ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border)', padding: '8px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = activeBoard?.bgImage ? 'rgba(255,255,255,0.1)' : 'var(--bg-subtle)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'} title="Edit Board">
+                                        <Settings size={16} />
+                                    </button>
+                                </div>
+                                {/* Board Columns */}
+                                <div style={{ flex: 1, display: 'flex', padding: 24, gap: 24, overflowX: 'auto', alignItems: 'flex-start' }}>
+                                    {activeColumns.map((col, index) => (
+                                        <div
+                                            key={col.id}
+                                            onDrop={e => handleDrop(e, col.id)}
+                                            onDragOver={handleDragOver}
+                                            style={{
+                                                flex: '0 0 300px', background: activeBoard?.bgImage ? 'rgba(18, 18, 18, 0.75)' : 'var(--bg-card)', backdropFilter: activeBoard?.bgImage ? 'blur(16px)' : 'none', borderRadius: 16,
+                                                border: activeBoard?.bgImage ? '1px solid rgba(255,255,255,0.1)' : '1px solid var(--border)', display: 'flex', flexDirection: 'column',
+                                                maxHeight: '100%', boxShadow: 'var(--shadow-md)',
+                                            }}
+                                        >
+                                            <div style={{ padding: '16px', borderBottom: activeBoard?.bgImage ? '1px solid rgba(255,255,255,0.1)' : '1px solid var(--border)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: activeBoard?.bgImage ? '#fff' : 'var(--text-primary)', flexShrink: 0 }}>
+                                                <div style={{ width: 10, height: 10, borderRadius: '50%', background: col.color }} />
+                                                {col.label}
+                                                <span style={{ marginLeft: 'auto', background: activeBoard?.bgImage ? 'rgba(255,255,255,0.15)' : 'var(--bg-subtle)', padding: '2px 8px', borderRadius: 100, fontSize: 11, color: activeBoard?.bgImage ? '#e0e0e0' : 'var(--text-secondary)' }}>
+                                                    {activeBoard?.tasks.filter(t => t.status === col.id).length || 0}
+                                                </span>
+                                            </div>
+                                            <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+                                                {index === 0 && (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="+ Add new task..."
+                                                        value={newTodo}
+                                                        onChange={e => setNewTodo(e.target.value)}
+                                                        onKeyDown={e => addTodo(e, col.id)}
+                                                        style={{
+                                                            padding: '12px', borderRadius: 8, border: activeBoard?.bgImage ? '1px dashed rgba(255,255,255,0.3)' : '1px dashed var(--border-strong)',
+                                                            background: 'transparent', outline: 'none', color: activeBoard?.bgImage ? '#fff' : 'var(--text-primary)', fontSize: 13, flexShrink: 0, transition: 'all 0.15s'
+                                                        }}
+                                                        onFocus={e => { e.target.style.borderColor = 'var(--brand)'; e.target.style.background = activeBoard?.bgImage ? 'rgba(255,255,255,0.05)' : 'var(--bg-subtle)'; }}
+                                                        onBlur={e => { e.target.style.borderColor = activeBoard?.bgImage ? 'rgba(255,255,255,0.3)' : 'var(--border-strong)'; e.target.style.background = 'transparent'; }}
+                                                    />
+                                                )}
+                                                {activeBoard?.tasks.filter(t => t.status === col.id).map(todo => (
+                                                    <div
+                                                        key={todo.id}
+                                                        draggable
+                                                        onDragStart={e => handleDragStart(e, todo.id)}
+                                                        onDragEnd={handleDragEnd}
+                                                        style={{
+                                                            padding: '14px', background: activeBoard?.bgImage ? 'rgba(255,255,255,0.05)' : 'var(--bg)', borderRadius: 8,
+                                                            border: activeBoard?.bgImage ? '1px solid rgba(255,255,255,0.1)' : '1px solid var(--border)', cursor: 'grab',
+                                                            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                                                            boxShadow: 'var(--shadow-sm)', transition: 'transform 0.15s', flexShrink: 0
+                                                        }}
+                                                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; if (activeBoard?.bgImage) e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; if (activeBoard?.bgImage) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                                                    >
+                                                        <span style={{ fontSize: 13, color: activeBoard?.bgImage ? '#fff' : 'var(--text-primary)', lineHeight: 1.4, wordBreak: 'break-word', paddingRight: 8 }}>{todo.text}</span>
+                                                        <button onClick={() => deleteTodo(todo.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: activeBoard?.bgImage ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)', fontSize: 12 }} onMouseEnter={e => e.currentTarget.style.color = '#ef4444'} onMouseLeave={e => e.currentTarget.style.color = activeBoard?.bgImage ? 'rgba(255,255,255,0.5)' : 'var(--text-muted)'}>✕</button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <AnimatePresence>
+                                    {isEditBoardModalOpen && (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} style={{ background: 'var(--bg-card)', padding: '32px 40px', borderRadius: 24, width: '100%', maxWidth: 540, border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)' }}>
+                                                <h2 style={{ margin: '0 0 24px', fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>Edit Board</h2>
+
+                                                <label style={{ display: 'block', marginBottom: 20 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Board Name</div>
+                                                    <input type="text" value={editBoardName} onChange={e => setEditBoardName(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="e.g. Project Alpha" onFocus={e => e.target.style.borderColor = 'var(--brand)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                </label>
+
+                                                <label style={{ display: 'block', marginBottom: 20 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}><ImageIcon size={14} /> Background Details</div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 12 }}>
+                                                        {PREBUILT_BGS.map(bg => (
+                                                            <div key={bg} onClick={() => setEditBoardBg(bg)} style={{ height: 64, borderRadius: 8, background: `url(${bg}) center/cover`, cursor: 'pointer', border: editBoardBg === bg ? '2px solid var(--brand)' : '2px solid transparent', boxShadow: editBoardBg === bg ? '0 0 0 2px var(--bg-card) inset' : 'none', opacity: editBoardBg === bg ? 1 : 0.6, transition: 'all 0.15s' }} onMouseEnter={e => e.currentTarget.style.opacity = '1'} onMouseLeave={e => { if (editBoardBg !== bg) e.currentTarget.style.opacity = '0.6'; }} />
+                                                        ))}
+                                                    </div>
+                                                    <input type="text" value={editBoardBg} onChange={e => setEditBoardBg(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="Or paste an image web URL..." onFocus={e => e.target.style.borderColor = 'var(--brand)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                </label>
+
+                                                <label style={{ display: 'block', marginBottom: 24 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)' }}><Palette size={14} /> Workflow Columns</div>
+                                                    <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}><input type="radio" checked={editBoardColsType === 'default'} onChange={() => setEditBoardColsType('default')} style={{ accentColor: 'var(--brand)' }} /> Default (Agile)</label>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, color: 'var(--text-primary)' }}><input type="radio" checked={editBoardColsType === 'custom'} onChange={() => setEditBoardColsType('custom')} style={{ accentColor: 'var(--brand)' }} /> Custom Steps</label>
+                                                    </div>
+                                                    {editBoardColsType === 'custom' && (
+                                                        <input type="text" value={editBoardCustomCols} onChange={e => setEditBoardCustomCols(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="Comma separated strings: To Do, Doing, Done" onFocus={e => e.target.style.borderColor = 'var(--brand)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                    )}
+                                                </label>
+
+                                                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 24, marginBottom: 32 }}>
+                                                    <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600, color: '#ef4444' }}>Danger Zone</h3>
+                                                    <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>To delete this board and all its tasks, type exactly <strong style={{ color: 'var(--text-primary)' }}>{activeBoard?.name}</strong> below:</p>
+                                                    <input type="text" value={deleteBoardConfirm} onChange={e => setDeleteBoardConfirm(e.target.value)} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} placeholder="Type board name to confirm" onFocus={e => e.target.style.borderColor = '#ef4444'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                                                </div>
+
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                                                    <button onClick={handleDeleteBoard} disabled={deleteBoardConfirm !== activeBoard?.name} style={{ padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, color: '#ef4444', opacity: deleteBoardConfirm === activeBoard?.name ? 1 : 0.4 }}>Delete Board</button>
+                                                    <div style={{ display: 'flex', gap: 12 }}>
+                                                        <button onClick={() => setIsEditBoardModalOpen(false)} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)' }}>Cancel</button>
+                                                        <button onClick={handleEditBoard} disabled={!editBoardName.trim()} style={{ padding: '10px 24px', background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 600, opacity: editBoardName.trim() ? 1 : 0.5, boxShadow: '0 4px 12px rgba(57, 224, 121, 0.25)' }}>Save Changes</button>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
