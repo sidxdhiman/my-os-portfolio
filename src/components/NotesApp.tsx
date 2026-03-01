@@ -1,7 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
+import htmlToPdfmake from 'html-to-pdfmake';
+import { asBlob } from 'html-docx-js-typescript';
+import { Cloud, Link as LinkIcon, Download, FileText, Mail } from 'lucide-react';
+import 'suneditor/dist/css/suneditor.min.css';
+
+(pdfMake as any).vfs = pdfFonts;
+
+const SunEditor = dynamic(() => import('suneditor-react'), { ssr: false });
 
 interface NotesAppProps {
     onClose: () => void;
@@ -100,6 +111,16 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
     const [newBoardName, setNewBoardName] = useState('');
     const [isCreatingBoard, setIsCreatingBoard] = useState(false);
 
+    // Share Modal state
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+    // Download Modal state
+    const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
+    // Auto-save state
+    const [isSaving, setIsSaving] = useState(false);
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     // Save data whenever it changes
     useEffect(() => {
         localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
@@ -144,18 +165,105 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
         ));
     }
 
-    function deleteActiveNote() {
-        if (!activeNoteId) return;
-        const updated = notes.filter(n => n.id !== activeNoteId);
+    const handleAutoSave = useCallback((content: string, title: string, id: string | null) => {
+        if (!id) return;
+        setIsSaving(true);
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => {
+            setNotes(prev => prev.map(n =>
+                n.id === id ? { ...n, title: title, content: content } : n
+            ));
+            setIsSaving(false);
+        }, 1000);
+    }, []);
+
+    function deleteNote(id: string, e: React.MouseEvent) {
+        e.stopPropagation();
+        const updated = notes.filter(n => n.id !== id);
         setNotes(updated);
-        if (updated.length > 0) {
-            selectNote(updated[0].id);
-        } else {
-            setActiveNoteId(null);
-            setNoteTitle('');
-            setNoteContent('');
+        if (activeNoteId === id) {
+            if (updated.length > 0) {
+                selectNote(updated[0].id);
+            } else {
+                setActiveNoteId(null);
+                setNoteTitle('');
+                setNoteContent('');
+            }
         }
     }
+
+    const handleDownloadPdf = () => {
+        if (!activeNoteId) return;
+        const note = notes.find(n => n.id === activeNoteId);
+        if (!note) return;
+
+        const html = htmlToPdfmake(noteContent, { window: window as any });
+        const docDefinition = {
+            content: [
+                { text: note.title || 'Untitled', fontSize: 24, bold: true, margin: [0, 0, 0, 20] },
+                html
+            ]
+        };
+
+        pdfMake.createPdf(docDefinition as any).download(`${note.title || 'note'}.pdf`);
+        setIsDownloadModalOpen(false);
+        setIsShareModalOpen(false);
+    };
+
+    const handleDownloadDocx = () => {
+        if (!activeNoteId) return;
+        const note = notes.find(n => n.id === activeNoteId);
+        if (!note) return;
+
+        const htmlString = `
+            <!DOCTYPE html>
+            <html>
+                <head><title>${note.title || 'Untitled'}</title></head>
+                <body>
+                    <h1>${note.title || 'Untitled'}</h1>
+                    ${noteContent}
+                </body>
+            </html>
+        `;
+
+        asBlob(htmlString).then(data => {
+            const url = URL.createObjectURL(data as Blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${note.title || 'note'}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        setIsDownloadModalOpen(false);
+        setIsShareModalOpen(false);
+    };
+
+    const handleShareEmail = () => {
+        if (!activeNoteId) return;
+        saveActiveNote();
+        const note = notes.find(n => n.id === activeNoteId);
+        if (!note) return;
+        const stripHtml = (html: string) => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || '';
+        };
+        const textContent = stripHtml(noteContent);
+        window.location.href = `mailto:?subject=${encodeURIComponent(note.title)}&body=${encodeURIComponent(textContent)}`;
+        setIsShareModalOpen(false);
+    };
+
+    const handleShareLink = () => {
+        if (!activeNoteId) return;
+        navigator.clipboard.writeText(`${window.location.origin}?note=${activeNoteId}`);
+        alert('Link copied to clipboard!');
+        setIsShareModalOpen(false);
+    };
 
     // Kanban actions
     const activeBoardIndex = boards.findIndex(b => b.id === activeBoardId);
@@ -337,13 +445,26 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
                                                     background: activeNoteId === note.id ? 'var(--bg-card)' : 'transparent',
                                                     border: `1px solid ${activeNoteId === note.id ? 'var(--brand)' : 'transparent'}`,
                                                     boxShadow: activeNoteId === note.id ? 'var(--shadow-sm)' : 'none',
-                                                    transition: 'all 0.15s'
+                                                    transition: 'all 0.15s',
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                                 }}
                                             >
-                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {note.title || 'Untitled'}
+                                                <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {note.title || 'Untitled'}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{note.date}</div>
                                                 </div>
-                                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{note.date}</div>
+                                                <button
+                                                    onClick={(e) => deleteNote(note.id, e)}
+                                                    style={{
+                                                        background: 'transparent', border: 'none', color: '#d32f2f',
+                                                        cursor: 'pointer', fontSize: 16, padding: '4px', opacity: activeNoteId === note.id ? 1 : 0.4
+                                                    }}
+                                                    title="Delete this note"
+                                                >
+                                                    🗑️
+                                                </button>
                                             </div>
                                         ))
                                     )}
@@ -367,26 +488,120 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
                                                 background: 'transparent', border: 'none', outline: 'none', width: '100%'
                                             }}
                                         />
-                                        <button
-                                            onClick={deleteActiveNote}
-                                            style={{
-                                                padding: '8px 16px', background: 'var(--bg-subtle)', color: '#d32f2f',
-                                                border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer'
-                                            }}
-                                        >
-                                            Delete
-                                        </button>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
+                                            {/* Save Status */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: isSaving ? 1 : 0.6, transition: 'all 0.2s' }}>
+                                                {isSaving ? (
+                                                    <div style={{ width: 80, height: 4, background: 'var(--bg-subtle)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+                                                        <motion.div
+                                                            initial={{ x: '-100%' }}
+                                                            animate={{ x: '100%' }}
+                                                            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                                                            style={{ width: '100%', height: '100%', background: 'var(--brand)', position: 'absolute', top: 0, left: 0 }}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <Cloud size={16} color="var(--text-muted)" />
+                                                )}
+                                                <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>
+                                                    {isSaving ? 'Saving...' : 'Saved'}
+                                                </span>
+                                            </div>
+
+                                            {/* Share Button & Modal Wrapper */}
+                                            <div style={{ position: 'relative' }}>
+                                                <button
+                                                    onClick={() => setIsShareModalOpen(!isShareModalOpen)}
+                                                    style={{
+                                                        padding: '8px 16px', background: 'var(--bg-subtle)', color: 'var(--text-primary)',
+                                                        border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s'
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-subtle)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                                                >
+                                                    <LinkIcon size={14} /> Share
+                                                </button>
+
+                                                <AnimatePresence>
+                                                    {isShareModalOpen && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                                            transition={{ duration: 0.15 }}
+                                                            style={{
+                                                                position: 'absolute', top: '100%', right: 0, marginTop: 8,
+                                                                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                                                                borderRadius: 12, boxShadow: 'var(--shadow-lg)',
+                                                                width: 200, zIndex: 100
+                                                            }}
+                                                        >
+                                                            <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column' }}>
+                                                                <div style={{ position: 'relative' }}>
+                                                                    <button onClick={() => setIsDownloadModalOpen(!isDownloadModalOpen)} style={{ width: '100%', padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                                        <Download size={14} /> Download
+                                                                    </button>
+                                                                    <AnimatePresence>
+                                                                        {isDownloadModalOpen && (
+                                                                            <motion.div
+                                                                                initial={{ opacity: 0, x: -10 }}
+                                                                                animate={{ opacity: 1, x: 0 }}
+                                                                                exit={{ opacity: 0, x: -10 }}
+                                                                                transition={{ duration: 0.15 }}
+                                                                                style={{
+                                                                                    position: 'absolute', top: 0, right: '100%', marginRight: 8,
+                                                                                    background: 'var(--bg-card)', border: '1px solid var(--border)',
+                                                                                    borderRadius: 12, boxShadow: 'var(--shadow-lg)',
+                                                                                    width: 160, zIndex: 110, overflow: 'hidden'
+                                                                                }}
+                                                                            >
+                                                                                <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column' }}>
+                                                                                    <button onClick={handleDownloadPdf} style={{ padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                                                        <FileText size={14} /> .PDF
+                                                                                    </button>
+                                                                                    <button onClick={handleDownloadDocx} style={{ padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                                                        <FileText size={14} /> .DOCX
+                                                                                    </button>
+                                                                                </div>
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
+                                                                </div>
+                                                                <button onClick={handleShareEmail} style={{ padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                                    <Mail size={14} /> Share via Email
+                                                                </button>
+                                                                <button onClick={handleShareLink} style={{ padding: '10px 16px', background: 'transparent', border: 'none', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                                    <LinkIcon size={14} /> Copy Link
+                                                                </button>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <textarea
-                                        placeholder="Start typing your note here... (Markdown supported mentally)"
-                                        value={noteContent}
-                                        onChange={e => { setNoteContent(e.target.value); saveActiveNote(); }}
-                                        onBlur={saveActiveNote}
-                                        style={{
-                                            flex: 1, background: 'transparent', border: 'none', resize: 'none', outline: 'none',
-                                            color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.6, fontFamily: 'var(--body)'
-                                        }}
-                                    />
+                                    <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', padding: '12px' }}>
+                                        <SunEditor
+                                            key={activeNoteId}
+                                            defaultValue={noteContent}
+                                            onChange={(content) => { setNoteContent(content); handleAutoSave(content, noteTitle, activeNoteId); }}
+                                            height="100%"
+                                            setDefaultStyle="font-family: inherit; font-size: 15px; background: transparent; color: var(--text-primary);"
+                                            setOptions={{
+                                                buttonList: [
+                                                    ['undo', 'redo'],
+                                                    ['formatBlock', 'font', 'fontSize'],
+                                                    ['bold', 'underline', 'italic', 'strike', 'fontColor', 'hiliteColor'],
+                                                    ['removeFormat'],
+                                                    ['outdent', 'indent', 'align', 'list', 'horizontalRule'],
+                                                    ['table', 'link']
+                                                ],
+                                                minHeight: '400px',
+                                                resizingBar: false
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             ) : (
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 14, flexDirection: 'column', gap: 12 }}>
@@ -400,7 +615,6 @@ export function NotesApp({ onClose, userName }: NotesAppProps) {
 
                 {activeTab === 'kanban' && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)', overflow: 'hidden' }}>
-
                         {/* Boards Bar */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', flexShrink: 0 }}>
                             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>PROJECTS</span>
