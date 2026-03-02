@@ -7,7 +7,7 @@ import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 /* ─────────────────────────────── Types ─────────────────────────────── */
 interface PdfEditorProps { onClose: () => void; }
 
-type Tool = 'select' | 'pen' | 'highlighter' | 'text' | 'rect' | 'circle' | 'line' | 'arrow' | 'eraser';
+type Tool = 'select' | 'pen' | 'highlighter' | 'text' | 'rect' | 'circle' | 'line' | 'arrow' | 'eraser' | 'image' | 'signature';
 
 interface Pt { x: number; y: number; }
 interface Annotation {
@@ -17,6 +17,7 @@ interface Annotation {
     x1?: number; y1?: number; x2?: number; y2?: number;
     text?: string; fontSize?: number;
     opacity?: number;
+    imgElement?: HTMLImageElement;
 }
 type PageAnnotations = Record<number, Annotation[]>;
 type UndoEntry = { page: number; snap: Annotation[] };
@@ -32,10 +33,12 @@ const TOOLS: { id: Tool; icon: string; label: string; shortcut: string }[] = [
     { id: 'line', icon: '╱', label: 'Line', shortcut: 'L' },
     { id: 'arrow', icon: '→', label: 'Arrow', shortcut: 'A' },
     { id: 'eraser', icon: '⌫', label: 'Eraser', shortcut: 'X' },
+    { id: 'image', icon: '🖼', label: 'Image', shortcut: 'I' },
+    { id: 'signature', icon: '✍', label: 'Signature', shortcut: 'S' },
 ];
 
 const COLORS = [
-    '#ffffff', '#ff6b6b', '#ffd93d', '#6bcb77',
+    '#000000', '#ffffff', '#ff6b6b', '#ffd93d', '#6bcb77',
     '#4fc3f7', '#ce93d8', '#ff8a65', '#ff6bdf',
     '#00e5ff', '#ffe082', '#a5d6a7', '#ef9a9a',
 ];
@@ -58,7 +61,7 @@ function drawArrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: nu
     ctx.fill();
 }
 
-function drawAnnotations(ctx: CanvasRenderingContext2D, annotations: Annotation[]) {
+function drawAnnotations(ctx: CanvasRenderingContext2D, annotations: Annotation[], selectedId?: string) {
     annotations.forEach(ann => {
         ctx.save();
         ctx.strokeStyle = ann.color;
@@ -147,6 +150,29 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, annotations: Annotation[
                     ctx.globalAlpha = ann.opacity ?? 1;
                     ctx.font = `${ann.fontSize ?? 18}px 'Space Grotesk', sans-serif`;
                     ctx.fillText(ann.text, ann.x!, ann.y!);
+                    if (ann.id === selectedId) {
+                        const m = ctx.measureText(ann.text);
+                        ctx.strokeStyle = 'rgba(0,120,255,0.8)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeRect(ann.x! - 2, ann.y! - ann.fontSize!, m.width + 4, ann.fontSize! + 4);
+                        ctx.setLineDash([]);
+                    }
+                }
+                break;
+
+            case 'image':
+            case 'signature':
+                if (ann.imgElement && ann.w !== undefined && ann.h !== undefined) {
+                    ctx.globalAlpha = ann.opacity ?? 1;
+                    ctx.drawImage(ann.imgElement, ann.x!, ann.y!, ann.w, ann.h);
+                    if (ann.id === selectedId) {
+                        ctx.strokeStyle = 'rgba(0,120,255,0.8)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeRect(ann.x! - 2, ann.y! - 2, ann.w + 4, ann.h + 4);
+                        ctx.setLineDash([]);
+                    }
                 }
                 break;
         }
@@ -156,6 +182,9 @@ function drawAnnotations(ctx: CanvasRenderingContext2D, annotations: Annotation[
 
 /* ─────────────────────────────── Component ─────────────────────────── */
 export function PdfEditor({ onClose }: PdfEditorProps) {
+    /* Main app mode */
+    const [appMode, setAppMode] = useState<'launchpad' | 'edit'>('launchpad');
+
     /* PDF state */
     const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
     const [numPages, setNumPages] = useState(0);
@@ -168,8 +197,8 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
     const [showThumbs, setShowThumbs] = useState(true);
 
     /* Editor state */
-    const [tool, setTool] = useState<Tool>('pen');
-    const [color, setColor] = useState('#ffffff');
+    const [tool, setTool] = useState<Tool>('select');
+    const [color, setColor] = useState('#000000');
     const [lineWidth, setLineWidth] = useState(3);
     const [fontSize, setFontSize] = useState(18);
     const [annotations, setAnnotations] = useState<PageAnnotations>({});
@@ -181,8 +210,15 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
     const [textInput, setTextInput] = useState('');
     const [exportMsg, setExportMsg] = useState('');
 
+    /* Selection & Dragging */
+    const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
+    const [isDraggingAnn, setIsDraggingAnn] = useState(false);
+    const [dragOffset, setDragOffset] = useState<Pt>({ x: 0, y: 0 });
+
     /* Refs */
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const mergeInputRef = useRef<HTMLInputElement>(null);
+    const imageInputRef = useRef<HTMLInputElement>(null);
     const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
     const annCanvasRef = useRef<HTMLCanvasElement>(null);
     const thumbRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -274,8 +310,8 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
         if (!annCanvas) return;
         const ctx = annCanvas.getContext('2d')!;
         ctx.clearRect(0, 0, annCanvas.width, annCanvas.height);
-        drawAnnotations(ctx, annotations[currentPage] ?? []);
-    }, [annotations, currentPage]);
+        drawAnnotations(ctx, annotations[currentPage] ?? [], selectedAnnId ?? undefined);
+    }, [annotations, currentPage, selectedAnnId]);
 
     /* ─── Thumbnails ───────────────────────────────────────────────── */
     useEffect(() => {
@@ -316,6 +352,17 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
         };
         const handler = (ev: KeyboardEvent) => {
             if (['INPUT', 'TEXTAREA'].includes((ev.target as HTMLElement)?.tagName)) return;
+            if (ev.key === 'Delete' || ev.key === 'Backspace') {
+                if (selectedAnnId) {
+                    pushUndo(currentPage);
+                    setAnnotations(prev => {
+                        const list = prev[currentPage] ?? [];
+                        return { ...prev, [currentPage]: list.filter(a => a.id !== selectedAnnId) };
+                    });
+                    setSelectedAnnId(null);
+                }
+                return;
+            }
             if (ev.ctrlKey && ev.key === 'z') { ev.preventDefault(); undo(); return; }
             if (ev.ctrlKey && ev.key === 'y') { ev.preventDefault(); redo(); return; }
             const fn = map[ev.key.toLowerCase()];
@@ -353,7 +400,56 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
         });
     }
 
+    /* ─── Image / Signature Loading ────────────────────────────────── */
+    const requestImage = useCallback((isSig: boolean) => {
+        if (imageInputRef.current) {
+            imageInputRef.current.accept = 'image/*';
+            imageInputRef.current.onchange = (e) => {
+                const target = e.target as HTMLInputElement;
+                const file = target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let w = img.width, h = img.height;
+                        if (w > 300) { h = (300 / w) * h; w = 300; }
+                        const ann: Annotation = {
+                            id: uid(), tool: isSig ? 'signature' : 'image',
+                            color: '', lineWidth: 1,
+                            x: 100, y: 100, w, h, imgElement: img, opacity: 1
+                        };
+                        pushUndo(currentPage);
+                        setAnnotations(prev => ({ ...prev, [currentPage]: [...(prev[currentPage] ?? []), ann] }));
+                        setTool('select');
+                        setSelectedAnnId(ann.id);
+                    };
+                    img.src = event.target?.result as string;
+                };
+                reader.readAsDataURL(file);
+                target.value = '';
+            };
+            imageInputRef.current.click();
+        }
+    }, [currentPage]);
+
+    useEffect(() => {
+        if (tool === 'image') { requestImage(false); setTool('select'); }
+        if (tool === 'signature') { requestImage(true); setTool('select'); }
+    }, [tool, requestImage]);
+
     /* ─── Pointer helpers ──────────────────────────────────────────── */
+    function hitTest(pos: Pt, ann: Annotation): boolean {
+        if (ann.tool === 'text' && ann.x !== undefined && ann.y !== undefined && ann.fontSize !== undefined) {
+            const tw = (ann.text?.length || 0) * (ann.fontSize * 0.6);
+            return pos.x >= ann.x && pos.x <= ann.x + tw && pos.y >= ann.y - ann.fontSize && pos.y <= ann.y + ann.fontSize * 0.2;
+        }
+        if ((ann.tool === 'image' || ann.tool === 'signature') && ann.x !== undefined && ann.y !== undefined && ann.w && ann.h) {
+            return pos.x >= ann.x && pos.x <= ann.x + ann.w && pos.y >= ann.y && pos.y <= ann.y + ann.h;
+        }
+        return false;
+    }
+
     function getPos(e: React.MouseEvent<HTMLCanvasElement>): Pt {
         const r = annCanvasRef.current!.getBoundingClientRect();
         const scaleX = annCanvasRef.current!.width / r.width;
@@ -366,12 +462,30 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
         e.preventDefault();
         const pos = getPos(e);
 
+        if (tool === 'select') {
+            const pageAnns = annRef.current[currentPage] ?? [];
+            for (let i = pageAnns.length - 1; i >= 0; i--) {
+                const a = pageAnns[i];
+                if (hitTest(pos, a)) {
+                    pushUndo(currentPage);
+                    setSelectedAnnId(a.id);
+                    setIsDraggingAnn(true);
+                    setDragOffset({ x: pos.x - a.x!, y: pos.y - a.y! });
+                    return;
+                }
+            }
+            setSelectedAnnId(null);
+            return;
+        }
+
         if (tool === 'text') {
+            setSelectedAnnId(null);
             setTextPos(pos);
             setTextInput('');
             return;
         }
 
+        setSelectedAnnId(null);
         pushUndo(currentPage);
         setIsDrawing(true);
         let ann: Annotation;
@@ -389,8 +503,24 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
     }
 
     function onPointerMove(e: React.MouseEvent<HTMLCanvasElement>) {
-        if (!isDrawing || !currentAnn) return;
         const pos = getPos(e);
+        if (tool === 'select' && isDraggingAnn && selectedAnnId) {
+            const list = annRef.current[currentPage] ?? [];
+            const idx = list.findIndex(a => a.id === selectedAnnId);
+            if (idx !== -1) {
+                list[idx].x = pos.x - dragOffset.x;
+                list[idx].y = pos.y - dragOffset.y;
+                const annCanvas = annCanvasRef.current;
+                if (annCanvas) {
+                    const ctx = annCanvas.getContext('2d')!;
+                    ctx.clearRect(0, 0, annCanvas.width, annCanvas.height);
+                    drawAnnotations(ctx, list, selectedAnnId);
+                }
+            }
+            return;
+        }
+
+        if (!isDrawing || !currentAnn) return;
         let updated: Annotation;
 
         if ((currentAnn.tool === 'pen' || currentAnn.tool === 'highlighter' || currentAnn.tool === 'eraser') && currentAnn.points) {
@@ -407,11 +537,17 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
         if (!annCanvas) return;
         const ctx = annCanvas.getContext('2d')!;
         ctx.clearRect(0, 0, annCanvas.width, annCanvas.height);
-        drawAnnotations(ctx, annRef.current[currentPage] ?? []);
-        drawAnnotations(ctx, [updated]);
+        drawAnnotations(ctx, annRef.current[currentPage] ?? [], selectedAnnId ?? undefined);
+        drawAnnotations(ctx, [updated], selectedAnnId ?? undefined);
     }
 
-    function onPointerUp() {
+    function onPointerUp(e: React.MouseEvent<HTMLCanvasElement>) {
+        if (tool === 'select' && isDraggingAnn) {
+            setIsDraggingAnn(false);
+            setAnnotations({ ...annRef.current });
+            return;
+        }
+
         if (!isDrawing || !currentAnn) return;
         setIsDrawing(false);
         setAnnotations(prev => ({
@@ -625,40 +761,68 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
             {/* ── Drop zone (no PDF loaded) ──────────────────────────── */}
             {!pdfDoc && (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-                    <motion.div
-                        animate={isDragOver ? { scale: 1.02, borderColor: 'var(--brand)' } : { scale: 1, borderColor: 'var(--border-strong)' }}
-                        transition={{ duration: 0.2 }}
-                        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-                        onDragLeave={() => setIsDragOver(false)}
-                        onDrop={e => { e.preventDefault(); setIsDragOver(false); const f = e.dataTransfer.files[0]; if (f) loadPdf(f); }}
-                        onClick={() => fileInputRef.current?.click()}
-                        style={{
-                            width: 460, maxWidth: '90%', padding: '60px 48px',
-                            border: '2px dashed var(--border-strong)', borderRadius: 'var(--radius-xl)',
-                            cursor: 'pointer', textAlign: 'center',
-                            background: isDragOver ? 'var(--brand-xlight)' : 'var(--bg-card)',
-                            boxShadow: 'var(--shadow-sm)',
-                            transition: 'all 0.2s',
-                        }}
-                    >
-                        <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) loadPdf(f); }} />
-                        <div style={{ fontSize: 56, marginBottom: 18, opacity: isDragOver ? 0.9 : 0.5 }}>{loading ? '⏳' : '📄'}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: isDragOver ? 'var(--brand)' : 'var(--text-primary)', marginBottom: 8, letterSpacing: '-0.3px' }}>
-                            {loading ? 'Loading PDF…' : 'Drop a PDF here'}
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                            Or <span style={{ color: 'var(--brand)', fontWeight: 600 }}>click to browse</span> your files
-                        </div>
-                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-muted)' }}>
-                            Multi-page PDFs · All in-browser · No upload
-                        </div>
-                        {loadError && (
-                            <div style={{ marginTop: 16, fontSize: 13, color: 'var(--error)', background: 'var(--error-bg)', padding: '8px 14px', borderRadius: 8 }}>
-                                {loadError}
-                            </div>
-                        )}
-                    </motion.div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 40 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, width: '100%', maxWidth: 960 }}>
+                        <motion.div
+                            whileHover={{ scale: 1.02, y: -4 }}
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
+                        >
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>✏️</div>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Edit PDF</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Add text, draw, highlight, erase, insert images and signatures into an existing document.</p>
+                        </motion.div>
+
+                        <motion.div
+                            whileHover={{ scale: 1.02, y: -4 }}
+                            onClick={() => mergeInputRef.current?.click()}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
+                        >
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>🧩</div>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Merge PDFs</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Combine multiple PDF files into a single document.</p>
+                        </motion.div>
+
+                        <motion.div
+                            whileHover={{ scale: 1.02, y: -4 }}
+                            onClick={() => alert('Rearranging UI is coming soon. Please open a PDF first to perform page operations.')}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
+                        >
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Rearrange Pages</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Rearrange, rotate, or delete pages from your PDF file.</p>
+                        </motion.div>
+                    </div>
+
+                    <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) { setAppMode('edit'); loadPdf(f); } }} />
+                    <input ref={mergeInputRef} type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={async e => {
+                        const files = Array.from(e.target.files ?? []);
+                        if (files.length < 2) return alert('Select at least 2 PDFs to merge.');
+                        try {
+                            setExportMsg('Merging PDFs…');
+                            const { PDFDocument } = await import('pdf-lib');
+                            const outDoc = await PDFDocument.create();
+                            for (const f of files) {
+                                const buf = await f.arrayBuffer();
+                                const inDoc = await PDFDocument.load(buf);
+                                const pages = await outDoc.copyPages(inDoc, inDoc.getPageIndices());
+                                pages.forEach(p => outDoc.addPage(p));
+                            }
+                            const outBuf = await outDoc.save();
+                            const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Merged.pdf' });
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            setExportMsg('Merged successfully ✓');
+                            setTimeout(() => setExportMsg(''), 3000);
+                        } catch (err) {
+                            console.error(err);
+                            setExportMsg('Merge failed.');
+                            setTimeout(() => setExportMsg(''), 3000);
+                        }
+                    }} />
+                    <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} />
                 </div>
             )}
 
@@ -757,6 +921,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                 <div
                                     key={n}
                                     onClick={() => setCurrentPage(n)}
+                                    className="pdf-thumb-wrapper"
                                     style={{
                                         cursor: 'pointer', borderRadius: 6, overflow: 'hidden',
                                         border: `2px solid ${n === currentPage ? 'var(--brand)' : 'var(--border)'}`,
@@ -765,6 +930,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                         boxShadow: n === currentPage ? 'var(--shadow-brand)' : 'var(--shadow-sm)',
                                     }}
                                 >
+                                    <style>{`.pdf-thumb-wrapper:hover .pdf-thumb-del { opacity: 1 !important; pointer-events: auto !important; }`}</style>
                                     <canvas ref={el => { thumbRefs.current[n - 1] = el; }} style={{ width: '100%', display: 'block' }} />
                                     <div style={{
                                         position: 'absolute', bottom: 2, right: 3,
@@ -772,6 +938,19 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                         color: n === currentPage ? 'var(--brand)' : 'var(--text-muted)',
                                         background: 'rgba(255,255,255,0.9)', padding: '1px 4px', borderRadius: 3,
                                     }}>{n}</div>
+                                    <button
+                                        className="pdf-thumb-del"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.alert("Removing a page completely implies PDF structural reconstruction. Currently, you can 'Clear' the page annotations. Direct page removal may be added via pdf-lib later.");
+                                        }}
+                                        style={{
+                                            position: 'absolute', top: 2, right: 2,
+                                            background: '#ef4444', color: '#fff',
+                                            border: 'none', borderRadius: 4, width: 22, height: 22,
+                                            fontSize: 11, cursor: 'pointer', opacity: 0, pointerEvents: 'none', transition: '0.2s',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                        }} title="Delete page">🗑</button>
                                 </div>
                             ))}
                         </div>
