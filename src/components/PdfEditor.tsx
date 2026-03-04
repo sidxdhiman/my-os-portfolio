@@ -200,7 +200,15 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
     const [mergeFiles, setMergeFiles] = useState<{ id: string, file: File, name: string }[] | null>(null);
     const docxToPdfRef = useRef<HTMLInputElement>(null);
     const pdfToDocxRef = useRef<HTMLInputElement>(null);
+
+    /* Compression State */
     const compressPdfRef = useRef<HTMLInputElement>(null);
+    const [compressFile, setCompressFile] = useState<File | null>(null);
+    const [compressAmount, setCompressAmount] = useState<number>(50);
+
+    /* Rearrange State */
+    const rearrangeInputRef = useRef<HTMLInputElement>(null);
+    const [rearrangeData, setRearrangeData] = useState<{ file: File, pages: { id: string, idx: number, thumb: string, rotation: number }[] } | null>(null);
 
     /* Editor state */
     const [tool, setTool] = useState<Tool>('select');
@@ -791,7 +799,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
 
                         <motion.div
                             whileHover={{ scale: 1.02, y: -4 }}
-                            onClick={() => alert('Rearranging UI is coming soon. Please open a PDF first to perform page operations.')}
+                            onClick={() => rearrangeInputRef.current?.click()}
                             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
                         >
                             <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
@@ -896,16 +904,31 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                             GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
                             const doc = await getDocument({ data: await f.arrayBuffer() }).promise;
 
-                            let fullText = '';
+                            const { Document, Packer, Paragraph, ImageRun } = await import('docx');
+                            const paragraphs: any[] = [];
+
                             for (let i = 1; i <= doc.numPages; i++) {
                                 const p = await doc.getPage(i);
-                                const content = await p.getTextContent();
-                                const strings = content.items.map((item: any) => item.str);
-                                fullText += strings.join(' ') + '\n';
+                                const vp = p.getViewport({ scale: 2.0 }); // 2x scale for good quality
+                                const canvas = document.createElement('canvas');
+                                canvas.width = vp.width;
+                                canvas.height = vp.height;
+                                await p.render({ canvasContext: canvas.getContext('2d')!, canvas, viewport: vp }).promise;
+
+                                const blob = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.85));
+                                if (!blob) continue;
+                                const arrayBuffer = await blob.arrayBuffer();
+
+                                paragraphs.push(new Paragraph({
+                                    children: [
+                                        new ImageRun({
+                                            data: arrayBuffer,
+                                            transformation: { width: 600, height: (vp.height / vp.width) * 600 }
+                                        })
+                                    ]
+                                }));
                             }
 
-                            const { Document, Packer, Paragraph, TextRun } = await import('docx');
-                            const paragraphs = fullText.split('\n').filter(l => l.trim()).map(l => new Paragraph({ children: [new TextRun(l)] }));
                             const docxFile = new Document({ sections: [{ children: paragraphs }] });
                             const blob = await Packer.toBlob(docxFile);
 
@@ -924,24 +947,38 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                     {/* Compress PDF Input */}
                     <input ref={compressPdfRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={async e => {
                         const f = e.target.files?.[0];
+                        if (f) {
+                            setCompressFile(f);
+                            setCompressAmount(50); // Default 50%
+                        }
+                    }} />
+
+                    {/* Rearrange PDF Input */}
+                    <input ref={rearrangeInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={async e => {
+                        const f = e.target.files?.[0];
                         if (!f) return;
+                        setExportMsg('Loading pages…');
                         try {
-                            setExportMsg('Compressing PDF…');
-                            const { PDFDocument } = await import('pdf-lib');
-                            const buf = await f.arrayBuffer();
-                            const inDoc = await PDFDocument.load(buf);
+                            const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+                            GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+                            const doc = await getDocument({ data: await f.arrayBuffer() }).promise;
 
-                            const outBuf = await inDoc.save({ useObjectStreams: false });
-
-                            const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
-                            const url = URL.createObjectURL(blob);
-                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Compressed_' + f.name });
-                            a.click();
-                            setExportMsg('Compressed successfully ✓');
-                            setTimeout(() => setExportMsg(''), 3000);
+                            const pagesData = [];
+                            for (let i = 1; i <= doc.numPages; i++) {
+                                const p = await doc.getPage(i);
+                                const vp = p.getViewport({ scale: 0.3 });
+                                const canvas = document.createElement('canvas');
+                                canvas.width = vp.width; canvas.height = vp.height;
+                                const ctx = canvas.getContext('2d')!;
+                                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, vp.width, vp.height);
+                                await p.render({ canvasContext: ctx, canvas, viewport: vp }).promise;
+                                pagesData.push({ id: uid(), idx: i - 1, thumb: canvas.toDataURL('image/jpeg', 0.6), rotation: 0 });
+                            }
+                            setRearrangeData({ file: f, pages: pagesData });
+                            setExportMsg('');
                         } catch (err) {
                             console.error(err);
-                            setExportMsg('Compression failed.');
+                            setExportMsg('Failed to read pages');
                             setTimeout(() => setExportMsg(''), 3000);
                         }
                     }} />
@@ -1021,6 +1058,199 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                     }}
                                     style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
                                 >Confirm Merge</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Compress Modal */}
+            <AnimatePresence>
+                {compressFile && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        style={{
+                            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)'
+                        }}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+                            style={{
+                                width: 'min(90vw, 400px)', background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border)',
+                                padding: 24, boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column',
+                            }}
+                        >
+                            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>Compress PDF</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>Select how much you want to compress the file (0% to 90%). Higher compression equals lower image quality.</p>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+                                <input
+                                    type="range" min="0" max="90" value={compressAmount}
+                                    onChange={(e) => setCompressAmount(Number(e.target.value))}
+                                    style={{ flex: 1, accentColor: 'var(--brand)' }}
+                                />
+                                <input
+                                    type="number" min="0" max="90" value={compressAmount}
+                                    onChange={(e) => setCompressAmount(Number(e.target.value))}
+                                    style={{
+                                        width: 60, padding: 8, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)',
+                                        color: 'var(--text-primary)', textAlign: 'center', fontFamily: 'var(--mono)'
+                                    }}
+                                />
+                                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text-secondary)' }}>%</span>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                <button
+                                    onClick={() => setCompressFile(null)}
+                                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}
+                                >Cancel</button>
+                                <button
+                                    onClick={async () => {
+                                        setExportMsg('Compressing PDF…');
+                                        try {
+                                            const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+                                            GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+                                            const doc = await getDocument({ data: await compressFile.arrayBuffer() }).promise;
+
+                                            const { PDFDocument } = await import('pdf-lib');
+                                            const outDoc = await PDFDocument.create();
+
+                                            const quality = 1.0 - (compressAmount / 100);
+
+                                            for (let i = 1; i <= doc.numPages; i++) {
+                                                const p = await doc.getPage(i);
+                                                const vp = p.getViewport({ scale: 1.5 });
+                                                const canvas = document.createElement('canvas');
+                                                canvas.width = vp.width; canvas.height = vp.height;
+                                                const ctx = canvas.getContext('2d')!;
+                                                ctx.fillStyle = '#fff';
+                                                ctx.fillRect(0, 0, vp.width, vp.height);
+                                                await p.render({ canvasContext: ctx, canvas, viewport: vp }).promise;
+
+                                                const imgData = canvas.toDataURL('image/jpeg', quality);
+                                                const jpgImage = await outDoc.embedJpg(imgData);
+                                                const page = outDoc.addPage([jpgImage.width, jpgImage.height]);
+                                                page.drawImage(jpgImage, { x: 0, y: 0, width: jpgImage.width, height: jpgImage.height });
+                                            }
+
+                                            const outBuf = await outDoc.save();
+                                            const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Compressed_' + compressFile.name });
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            setExportMsg('Compressed successfully ✓');
+                                            setTimeout(() => setExportMsg(''), 3000);
+                                        } catch (err) {
+                                            console.error(err);
+                                            setExportMsg('Compression failed.');
+                                            setTimeout(() => setExportMsg(''), 3000);
+                                        }
+                                        setCompressFile(null);
+                                    }}
+                                    style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                                >Compress Now</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Rearrange Modal */}
+            <AnimatePresence>
+                {rearrangeData && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        style={{
+                            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)'
+                        }}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+                            style={{
+                                width: 'min(95vw, 840px)', background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border)',
+                                padding: 24, boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column',
+                            }}
+                        >
+                            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>Rearrange Pages</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>Drag and drop to reorder. Click a page's Rotate or Delete button.</p>
+
+                            <div style={{ flex: 1, overflowY: 'auto', maxHeight: '60vh', marginBottom: 20, minHeight: 300 }}>
+                                <Reorder.Group axis="y" values={rearrangeData.pages} onReorder={(pages) => setRearrangeData({ ...rearrangeData, pages })} style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                                    {rearrangeData.pages.map((p, index) => (
+                                        <Reorder.Item
+                                            key={p.id} value={p}
+                                            style={{
+                                                background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)',
+                                                cursor: 'grab', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 8, gap: 8,
+                                                width: 140, boxShadow: 'var(--shadow-sm)'
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-secondary)' }}>Page {index + 1}</div>
+                                            <img src={p.thumb} style={{ width: '100%', height: 160, objectFit: 'contain', background: '#fff', transform: `rotate(${p.rotation}deg)`, transition: 'transform 0.2s', borderRadius: 4 }} alt={`Page ${p.idx + 1}`} draggable={false} />
+                                            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                                                <button onClick={() => {
+                                                    const newArr = [...rearrangeData.pages];
+                                                    const idx = newArr.findIndex(x => x.id === p.id);
+                                                    newArr[idx].rotation = (newArr[idx].rotation + 90) % 360;
+                                                    setRearrangeData({ ...rearrangeData, pages: newArr });
+                                                }} style={{ flex: 1, padding: 4, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-card)', fontSize: 12 }}>↻</button>
+                                                <button onClick={() => {
+                                                    const newArr = rearrangeData.pages.filter(x => x.id !== p.id);
+                                                    setRearrangeData({ ...rearrangeData, pages: newArr });
+                                                }} style={{ flex: 1, padding: 4, borderRadius: 6, border: 'none', background: '#ff5f57', color: '#fff', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                                            </div>
+                                        </Reorder.Item>
+                                    ))}
+                                </Reorder.Group>
+                                {rearrangeData.pages.length === 0 && (
+                                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No pages left. It will be empty.</div>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                <button
+                                    onClick={() => setRearrangeData(null)}
+                                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}
+                                >Cancel</button>
+                                <button
+                                    onClick={async () => {
+                                        setExportMsg('Applying changes…');
+                                        try {
+                                            const { PDFDocument, degrees } = await import('pdf-lib');
+                                            const buf = await rearrangeData.file.arrayBuffer();
+                                            const inDoc = await PDFDocument.load(buf);
+                                            const outDoc = await PDFDocument.create();
+
+                                            for (const pageItem of rearrangeData.pages) {
+                                                const [copiedPage] = await outDoc.copyPages(inDoc, [pageItem.idx]);
+                                                if (pageItem.rotation) {
+                                                    const currentRotation = copiedPage.getRotation().angle;
+                                                    copiedPage.setRotation(degrees(currentRotation + pageItem.rotation));
+                                                }
+                                                outDoc.addPage(copiedPage);
+                                            }
+
+                                            const outBuf = await outDoc.save();
+                                            const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Rearranged_' + rearrangeData.file.name });
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            setExportMsg('Rearranged successfully ✓');
+                                            setTimeout(() => setExportMsg(''), 3000);
+                                        } catch (err) {
+                                            console.error(err);
+                                            setExportMsg('Rearrange failed.');
+                                            setTimeout(() => setExportMsg(''), 3000);
+                                        }
+                                        setRearrangeData(null);
+                                    }}
+                                    style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                                >Save PDF</button>
                             </div>
                         </motion.div>
                     </motion.div>
