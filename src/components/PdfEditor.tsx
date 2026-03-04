@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -195,6 +195,12 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
     const [loadError, setLoadError] = useState('');
     const [isDragOver, setIsDragOver] = useState(false);
     const [showThumbs, setShowThumbs] = useState(true);
+
+    /* Launchpad tools state */
+    const [mergeFiles, setMergeFiles] = useState<{ id: string, file: File, name: string }[] | null>(null);
+    const docxToPdfRef = useRef<HTMLInputElement>(null);
+    const pdfToDocxRef = useRef<HTMLInputElement>(null);
+    const compressPdfRef = useRef<HTMLInputElement>(null);
 
     /* Editor state */
     const [tool, setTool] = useState<Tool>('select');
@@ -792,39 +798,234 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                             <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Rearrange Pages</h3>
                             <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Rearrange, rotate, or delete pages from your PDF file.</p>
                         </motion.div>
+
+                        {/* Convert to PDF */}
+                        <motion.div
+                            whileHover={{ scale: 1.02, y: -4 }}
+                            onClick={() => docxToPdfRef.current?.click()}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
+                        >
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>🔄</div>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Convert to PDF</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Convert DOCX or Images into a PDF document.</p>
+                        </motion.div>
+
+                        {/* PDF to DOCX */}
+                        <motion.div
+                            whileHover={{ scale: 1.02, y: -4 }}
+                            onClick={() => pdfToDocxRef.current?.click()}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
+                        >
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>PDF to DOCX</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Extract text from a PDF into a Word document.</p>
+                        </motion.div>
+
+                        {/* Compress PDF */}
+                        <motion.div
+                            whileHover={{ scale: 1.02, y: -4 }}
+                            onClick={() => compressPdfRef.current?.click()}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '32px 24px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}
+                        >
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>🗜️</div>
+                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>Compress PDF</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Reduce the file size of your PDF document.</p>
+                        </motion.div>
                     </div>
 
                     <input ref={fileInputRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) { setAppMode('edit'); loadPdf(f); } }} />
-                    <input ref={mergeInputRef} type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={async e => {
+                    <input ref={mergeInputRef} type="file" accept="application/pdf" multiple style={{ display: 'none' }} onChange={e => {
                         const files = Array.from(e.target.files ?? []);
                         if (files.length < 2) return alert('Select at least 2 PDFs to merge.');
+                        setMergeFiles(files.map(f => ({ id: uid(), file: f, name: f.name })));
+                    }} />
+
+                    {/* DOCX to PDF Input */}
+                    <input ref={docxToPdfRef} type="file" accept=".docx,image/*" style={{ display: 'none' }} onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
                         try {
-                            setExportMsg('Merging PDFs…');
+                            setExportMsg('Converting to PDF…');
                             const { PDFDocument } = await import('pdf-lib');
-                            const outDoc = await PDFDocument.create();
-                            for (const f of files) {
+                            const doc = await PDFDocument.create();
+
+                            if (f.name.endsWith('.docx')) {
+                                const mammoth = (await import('mammoth')).default || (await import('mammoth'));
                                 const buf = await f.arrayBuffer();
-                                const inDoc = await PDFDocument.load(buf);
-                                const pages = await outDoc.copyPages(inDoc, inDoc.getPageIndices());
-                                pages.forEach(p => outDoc.addPage(p));
+                                const { value: text } = await mammoth.extractRawText({ arrayBuffer: buf });
+
+                                const lines = text.split('\n');
+                                let page = doc.addPage();
+                                let y = page.getHeight() - 50;
+                                for (const line of lines) {
+                                    if (y < 50) { page = doc.addPage(); y = page.getHeight() - 50; }
+                                    page.drawText(line.substring(0, 100), { x: 50, y, size: 12 });
+                                    y -= 16;
+                                }
+                            } else {
+                                const buf = await f.arrayBuffer();
+                                let img;
+                                if (f.type.includes('png')) img = await doc.embedPng(buf);
+                                else img = await doc.embedJpg(buf);
+
+                                const page = doc.addPage([img.width, img.height]);
+                                page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
                             }
-                            const outBuf = await outDoc.save();
+
+                            const outBuf = await doc.save();
                             const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
                             const url = URL.createObjectURL(blob);
-                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Merged.pdf' });
+                            const a = Object.assign(document.createElement('a'), { href: url, download: f.name + '.pdf' });
                             a.click();
-                            URL.revokeObjectURL(url);
-                            setExportMsg('Merged successfully ✓');
+                            setExportMsg('Converted successfully ✓');
                             setTimeout(() => setExportMsg(''), 3000);
                         } catch (err) {
                             console.error(err);
-                            setExportMsg('Merge failed.');
+                            setExportMsg('Conversion failed.');
                             setTimeout(() => setExportMsg(''), 3000);
                         }
                     }} />
+
+                    {/* PDF to DOCX Input */}
+                    <input ref={pdfToDocxRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        try {
+                            setExportMsg('Converting to DOCX…');
+                            const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+                            GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+                            const doc = await getDocument({ data: await f.arrayBuffer() }).promise;
+
+                            let fullText = '';
+                            for (let i = 1; i <= doc.numPages; i++) {
+                                const p = await doc.getPage(i);
+                                const content = await p.getTextContent();
+                                const strings = content.items.map((item: any) => item.str);
+                                fullText += strings.join(' ') + '\n';
+                            }
+
+                            const { Document, Packer, Paragraph, TextRun } = await import('docx');
+                            const paragraphs = fullText.split('\n').filter(l => l.trim()).map(l => new Paragraph({ children: [new TextRun(l)] }));
+                            const docxFile = new Document({ sections: [{ children: paragraphs }] });
+                            const blob = await Packer.toBlob(docxFile);
+
+                            const url = URL.createObjectURL(blob);
+                            const a = Object.assign(document.createElement('a'), { href: url, download: f.name.replace('.pdf', '') + '.docx' });
+                            a.click();
+                            setExportMsg('Converted successfully ✓');
+                            setTimeout(() => setExportMsg(''), 3000);
+                        } catch (err) {
+                            console.error(err);
+                            setExportMsg('Conversion failed.');
+                            setTimeout(() => setExportMsg(''), 3000);
+                        }
+                    }} />
+
+                    {/* Compress PDF Input */}
+                    <input ref={compressPdfRef} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        try {
+                            setExportMsg('Compressing PDF…');
+                            const { PDFDocument } = await import('pdf-lib');
+                            const buf = await f.arrayBuffer();
+                            const inDoc = await PDFDocument.load(buf);
+
+                            const outBuf = await inDoc.save({ useObjectStreams: false });
+
+                            const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Compressed_' + f.name });
+                            a.click();
+                            setExportMsg('Compressed successfully ✓');
+                            setTimeout(() => setExportMsg(''), 3000);
+                        } catch (err) {
+                            console.error(err);
+                            setExportMsg('Compression failed.');
+                            setTimeout(() => setExportMsg(''), 3000);
+                        }
+                    }} />
+
                     <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} />
                 </div>
             )}
+
+            {/* Merge PDF Modal */}
+            <AnimatePresence>
+                {mergeFiles && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        style={{
+                            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)'
+                        }}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+                            style={{
+                                width: 'min(90vw, 500px)', background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border)',
+                                padding: 24, boxShadow: 'var(--shadow-xl)', display: 'flex', flexDirection: 'column',
+                            }}
+                        >
+                            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: 'var(--text-primary)' }}>Arrange PDFs</h3>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>Drag and drop to set the merge order. Top ones will appear first.</p>
+
+                            <div style={{ flex: 1, overflowY: 'auto', maxHeight: '50vh', marginBottom: 20 }}>
+                                <Reorder.Group axis="y" values={mergeFiles} onReorder={setMergeFiles} style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {mergeFiles.map(mf => (
+                                        <Reorder.Item
+                                            key={mf.id} value={mf}
+                                            style={{
+                                                padding: '12px 16px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)',
+                                                cursor: 'grab', display: 'flex', alignItems: 'center', gap: 12, userSelect: 'none'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: 16, opacity: 0.5 }}>☷</span>
+                                            <span style={{ fontFamily: 'var(--mono)', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mf.name}</span>
+                                        </Reorder.Item>
+                                    ))}
+                                </Reorder.Group>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                                <button
+                                    onClick={() => setMergeFiles(null)}
+                                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-primary)' }}
+                                >Cancel</button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            setExportMsg('Merging PDFs…');
+                                            const { PDFDocument } = await import('pdf-lib');
+                                            const outDoc = await PDFDocument.create();
+                                            for (const mf of mergeFiles) {
+                                                const buf = await mf.file.arrayBuffer();
+                                                const inDoc = await PDFDocument.load(buf);
+                                                const pages = await outDoc.copyPages(inDoc, inDoc.getPageIndices());
+                                                pages.forEach(p => outDoc.addPage(p));
+                                            }
+                                            const outBuf = await outDoc.save();
+                                            const blob = new Blob([outBuf as unknown as BlobPart], { type: 'application/pdf' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = Object.assign(document.createElement('a'), { href: url, download: 'Merged.pdf' });
+                                            a.click();
+                                            URL.revokeObjectURL(url);
+                                            setExportMsg('Merged successfully ✓');
+                                            setTimeout(() => setExportMsg(''), 3000);
+                                        } catch (err) {
+                                            console.error(err);
+                                            setExportMsg('Merge failed.');
+                                            setTimeout(() => setExportMsg(''), 3000);
+                                        }
+                                        setMergeFiles(null);
+                                    }}
+                                    style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                                >Confirm Merge</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* ── Main editor layout ────────────────────────────────── */}
             {pdfDoc && (
