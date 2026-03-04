@@ -923,6 +923,7 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                                     children: [
                                         new ImageRun({
                                             data: arrayBuffer,
+                                            type: 'jpg',
                                             transformation: { width: 600, height: (vp.height / vp.width) * 600 }
                                         })
                                     ]
@@ -1179,29 +1180,35 @@ export function PdfEditor({ onClose }: PdfEditorProps) {
                             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>Drag and drop to reorder. Click a page's Rotate or Delete button.</p>
 
                             <div style={{ flex: 1, overflowY: 'auto', maxHeight: '60vh', marginBottom: 20, minHeight: 300 }}>
-                                <Reorder.Group axis="y" values={rearrangeData.pages} onReorder={(pages) => setRearrangeData({ ...rearrangeData, pages })} style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                                <Reorder.Group axis="y" values={rearrangeData.pages} onReorder={(pages) => setRearrangeData({ ...rearrangeData, pages })} style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     {rearrangeData.pages.map((p, index) => (
                                         <Reorder.Item
                                             key={p.id} value={p}
                                             style={{
                                                 background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)',
-                                                cursor: 'grab', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 8, gap: 8,
-                                                width: 140, boxShadow: 'var(--shadow-sm)'
+                                                cursor: 'grab', display: 'flex', flexDirection: 'row', alignItems: 'center', padding: '12px 16px', gap: 16,
+                                                boxShadow: 'var(--shadow-sm)', width: '100%'
                                             }}
                                         >
-                                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-secondary)' }}>Page {index + 1}</div>
-                                            <img src={p.thumb} style={{ width: '100%', height: 160, objectFit: 'contain', background: '#fff', transform: `rotate(${p.rotation}deg)`, transition: 'transform 0.2s', borderRadius: 4 }} alt={`Page ${p.idx + 1}`} draggable={false} />
-                                            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                                            <span style={{ fontSize: 18, opacity: 0.3, cursor: 'grab' }}>☷</span>
+                                            <div style={{ width: 60, height: 85, position: 'relative', flexShrink: 0, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                                                <img src={p.thumb} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff', transform: `rotate(${p.rotation}deg)`, transition: 'transform 0.2s', display: 'block' }} alt={`Page ${p.idx + 1}`} draggable={false} />
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>Page {p.idx + 1}</div>
+                                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Position: {index + 1}</div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 8 }}>
                                                 <button onClick={() => {
                                                     const newArr = [...rearrangeData.pages];
                                                     const idx = newArr.findIndex(x => x.id === p.id);
                                                     newArr[idx].rotation = (newArr[idx].rotation + 90) % 360;
                                                     setRearrangeData({ ...rearrangeData, pages: newArr });
-                                                }} style={{ flex: 1, padding: 4, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-card)', fontSize: 12 }}>↻</button>
+                                                }} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--bg-card)', fontSize: 13 }}>↻ Rotate</button>
                                                 <button onClick={() => {
                                                     const newArr = rearrangeData.pages.filter(x => x.id !== p.id);
                                                     setRearrangeData({ ...rearrangeData, pages: newArr });
-                                                }} style={{ flex: 1, padding: 4, borderRadius: 6, border: 'none', background: '#ff5f57', color: '#fff', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                                                }} style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#ff5f57', color: '#fff', cursor: 'pointer', fontSize: 13 }}>🗑 Delete</button>
                                             </div>
                                         </Reorder.Item>
                                     ))}
