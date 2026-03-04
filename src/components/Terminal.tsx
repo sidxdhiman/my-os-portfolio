@@ -154,7 +154,7 @@ export function Terminal({ isOpen, user, onClose, pushApp }: TerminalProps) {
             if (e.key === 'Enter') { e.preventDefault(); const m = MENU_MODULES[menuIdx]; pushApp(m.id); addLines(makeLines([`  ✓ Launching ${m.label}…`, ''])); setShowMenu(false); setInput(''); return; }
             if (e.key === 'Escape') { setShowMenu(false); addLines(makeLines(['  [closed]', ''])); return; }
         }
-        if (e.key === 'Enter') { processCommand(input); setInput(''); setShowMenu(false); }
+        if (e.key === 'Enter') { processCommand(input); setInput(''); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); const ni = Math.min(histIdx + 1, history.length - 1); setHistIdx(ni); setInput(history[ni] ?? ''); }
         else if (e.key === 'ArrowDown') { e.preventDefault(); const ni = Math.max(histIdx - 1, -1); setHistIdx(ni); setInput(ni === -1 ? '' : history[ni]); }
     }
